@@ -1,7 +1,7 @@
 {
-    "name": "b_tle",
+    "name": "*project_name",
     "image": "idf_5.1_env:latest",
-    "initializeCommand": "docker build -t idf_5.1_env:latest ./.devcontainer",
+    "initializeCommand": "bash ./.devcontainer/init_idf_image.sh idf_5.1_env:latest",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind",
     "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
     "mounts": [
@@ -26,13 +26,13 @@
                 "ms-vscode.cpptools",
                 "espressif.esp-idf-extension",
                 "eamodio.gitlens",
-                "Thinker.mock-server"
+                // "Thinker.mock-server"
             ]
         }
     },
     "updateRemoteUserUID": false,
     "postStartCommand": "git config --global --replace-all safe.directory /opt/esp/idf && git config --global --add safe.directory /opt/esp/idf/components/openthread/openthread",
     "runArgs": [
-        "--privileged", "--name=b_tle"
+        "--privileged", "--name=*project_name"
     ]
 }
