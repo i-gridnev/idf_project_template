@@ -1,0 +1,38 @@
+{
+    "name": "b_tle",
+    "image": "idf_5.1_env:latest",
+    "initializeCommand": "docker build -t idf_5.1_env:latest ./.devcontainer",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind",
+    "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+    "mounts": [
+        "source=extensionCache,target=/root/.vscode-server/extensions,type=volume"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "C_Cpp.clang_format_style": "file:/opt/c_lang_format/.clang-format",
+                "idf.espIdfPath": "/opt/esp/idf",
+                "idf.customExtraPaths": "/opt/esp/tools/xtensa-esp-elf-gdb/12.1_20221002/xtensa-esp-elf-gdb/bin:/opt/esp/tools/riscv32-esp-elf-gdb/12.1_20221002/riscv32-esp-elf-gdb/bin:/opt/esp/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/bin:/opt/esp/tools/xtensa-esp32s2-elf/esp-12.2.0_20230208/xtensa-esp32s2-elf/bin:/opt/esp/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:/opt/esp/tools/riscv32-esp-elf/esp-12.2.0_20230208/riscv32-esp-elf/bin:/opt/esp/tools/esp32ulp-elf/2.35_20220830/esp32ulp-elf/bin:/opt/esp/tools/openocd-esp32/v0.12.0-esp32-20230419/openocd-esp32/bin:/opt/esp/tools/esp-rom-elfs/20230320",
+                "idf.customExtraVars": {
+                    "OPENOCD_SCRIPTS": "/opt/esp/tools/openocd-esp32/v0.12.0-esp32-20230419/openocd-esp32/share/openocd/scripts"
+                },
+                "idf.pythonBinPath": "/opt/esp/python_env/idf5.1_py3.8_env/bin/python",
+                "idf.toolsPath": "/opt/esp",
+                "idf.svdFilePath": "/opt/esp_debug/svd/${config:idf.adapterTargetName}.svd",
+                "idf.gitPath": "/usr/bin/git"
+            },
+            "extensions": [
+                "ms-vscode.cpptools",
+                "espressif.esp-idf-extension",
+                "eamodio.gitlens",
+                "Thinker.mock-server"
+            ]
+        }
+    },
+    "updateRemoteUserUID": false,
+    "postStartCommand": "git config --global --replace-all safe.directory /opt/esp/idf && git config --global --add safe.directory /opt/esp/idf/components/openthread/openthread",
+    "runArgs": [
+        "--privileged", "--name=b_tle"
+    ]
+}
