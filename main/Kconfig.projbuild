@@ -1,0 +1,10 @@
+menu "App"
+    menu "Smart Button"     
+        config SMART_BTN_LONG_PRESS_TIME
+            int "Smart button long press time (ms)"
+            range 1000 8000
+            default 3000
+            help
+                Long press detection threshold in ms.
+    endmenu
+endmenu

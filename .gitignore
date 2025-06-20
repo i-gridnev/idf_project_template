@@ -1,1 +1,10 @@
-dev_template/.git
+build/
+partition_table/
+FS_build.bat
+FS_build.sn
+managed_components/
+.vscode/.espidf.peripherals.state.json
+debug.log
+sdkconfig
+sdkconfig.old
+*.bin
