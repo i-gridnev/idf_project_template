@@ -1,5 +1,5 @@
 {
-    "name": "*project_name",
+    "name": "{{cookiecutter.project_name}}",
     "image": "idf_5.1_env:latest",
     "initializeCommand": "bash ./.devcontainer/init_idf_image.sh idf_5.1_env:latest",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind",
@@ -33,6 +33,6 @@
     "updateRemoteUserUID": false,
     "postStartCommand": "git config --global --replace-all safe.directory /opt/esp/idf && git config --global --add safe.directory /opt/esp/idf/components/openthread/openthread",
     "runArgs": [
-        "--privileged", "--name=*project_name"
+        "--privileged", "--name={{cookiecutter.project_name}}"
     ]
 }

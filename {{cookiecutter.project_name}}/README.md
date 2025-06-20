@@ -1,4 +1,4 @@
-# Project
+# Project {{ cookiecutter.project_name }}
 MCU: ESP32 S3
 
 ## Pinout
