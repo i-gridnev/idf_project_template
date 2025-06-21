@@ -5,6 +5,4 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project({{cookiecutter.project_name}})
-
-some testing merging
+project(dev_template)
