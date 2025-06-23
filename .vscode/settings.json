@@ -10,6 +10,23 @@
     "IDF_TARGET": "esp32s3"
 },
 "idf.port": "/dev/ttyUSB0",
-"idf.enableSizeTaskAfterBuildTask": false,
-"idf.flashType": "UART"
+// "idf.enableSizeTaskAfterBuildTask": false,
+"idf.flashType": "UART",
+"files.associations": {
+    "esp_log.h": "c",
+    "stdbool.h": "c",
+    "eventbus_config.h": "c",
+    "array": "c",
+    "charconv": "c",
+    "compare": "c",
+    "functional": "c",
+    "ratio": "c",
+    "tuple": "c",
+    "type_traits": "c",
+    "utility": "c",
+    "variant": "c",
+    "esp_event.h": "c",
+    "string.h": "c",
+    "membership.h": "c"
+}
 }
