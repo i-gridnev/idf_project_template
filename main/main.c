@@ -13,39 +13,35 @@
 
 #define TAG "APP"
 
+typedef struct{
+    module_base module;
+    int t_int1;
+    int t_int2;
+    char* name;
+} t_issuer_m;
+
+esp_err_t t_issuer_handler(module_base* self, event_t* event){
+
+}
+
+t_issuer_m*
+t_issuer_create(int id, char* name){
+    t_issuer_m* m = malloc(sizeof(t_issuer_m));
+
+    module_base_config_t config ={
+        .id = id,
+        .max_evts = 5,
+        .event_handler = t_issuer_handler,
+    };
+    module_create(&m->module, &config);
+}
+
 void
 app_main(void) {
     ESP_LOGI(TAG, "...starting...");
     /*======= Component initialization block =======*/
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_LOGI(TAG, ":::Initialized RAM: free=%lu, min=%lu", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-
-    ModuleBase m1 = {.id = MODULE_1};
-    ModuleBase m2 = {.id = MODULE_2};
-    ModuleBase m3 = {.id = MODULE_3};
-    ModuleBase m4 = {.id = MODULE_4};
-    ModuleBase m5 = {.id = MODULE_5};
-
-    eventbus_init();
-
-    eventbus_register(&m1, GROUP_1);
-    eventbus_register(&m1, GROUP_2);
-    eventbus_register(&m1, GROUP_3);
-
-    eventbus_register(&m2, GROUP_1);
-    eventbus_register(&m2, GROUP_2);
-
-    eventbus_register(&m3, GROUP_3);
-    eventbus_register(&m3, GROUP_4);
-
-    eventbus_register(&m5, GROUP_1);
-    eventbus_register(&m5, GROUP_2);
-    eventbus_register(&m5, GROUP_3);
-    eventbus_register(&m5, GROUP_4);
-
-    eventbus_print_layput();
-
-
 
 
     // while (1) {

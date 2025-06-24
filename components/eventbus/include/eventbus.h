@@ -10,35 +10,26 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+#include "bus_module.h"
 #include "eventbus_config.h"
 
-typedef struct event event_t;
+#define ANY_MODULE_ID -1
 
-typedef struct {
+typedef struct event {
     int id;
-    int group_id;
-    esp_err_t (*event_handler)(event_t* event);
-} ModuleBase;
-
-struct event {
-    int id;
-    ModuleBase* issuer;
+    module_base* issuer;
 
     struct {
         void* data;
         size_t size;
         void (*free_fcn)(void* data);
     } payload;
-
-    struct {
-        int* module_id;
-        size_t amount;
-        int group_id;
-    } target;
-};
+} event_t;
 
 void eventbus_init();
-void eventbus_print_layput();
-void eventbus_register(ModuleBase* module, group_id id);
+
+esp_err_t eventbus_module_register(module_base* module);
+
+module_base* eventbus_module_get(int id);
 
 #endif /* _EVENTBUS_H_ */
