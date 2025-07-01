@@ -33,8 +33,8 @@ struct module_base {
     esp_err_t (*event_handler)(module_base* self, event_t* event);
 };
 
-esp_err_t module_create(module_base* module, module_base_config_t* config);
+esp_err_t module_create(module_base* self, module_base_config_t* config);
 
-esp_err_t module_subscribe(module_base* module, int target_id, int evt_id);
+esp_err_t module_subscribe(module_base* self, int target_id, int evt_id);
 
 #endif /* _BUS_MODULE_H_ */

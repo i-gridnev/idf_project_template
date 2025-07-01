@@ -26,10 +26,12 @@ typedef struct event {
     } payload;
 } event_t;
 
-void eventbus_init();
+esp_err_t eventbus_init(size_t modules_amount);
 
 esp_err_t eventbus_module_register(module_base* module);
 
 module_base* eventbus_module_get(int id);
+
+esp_err_t eventbus_post_event(event_t* event);
 
 #endif /* _EVENTBUS_H_ */
