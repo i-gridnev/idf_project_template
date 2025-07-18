@@ -99,7 +99,8 @@ _use_default(nvs_handle_t nvs_handle, config_entry_t* entry) {
         if (entry->value.data.ptr) {
             free(entry->value.data.ptr);
         }
-        entry->value.data.ptr = malloc(entry->default_value.size);
+        entry->value.data.ptr = (entry->type == CFG_TYPE_STRING) ? calloc(1, entry->default_value.size + 1)
+                                                                 : calloc(1, entry->default_value.size);
         memcpy(entry->value.data.ptr, entry->default_value.data.ptr, entry->default_value.size);
     }
     return _save_entry(nvs_handle, entry);
