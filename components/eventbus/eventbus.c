@@ -43,7 +43,6 @@ eventbus_task(void* params) {
 
 esp_err_t
 eventbus_init(size_t modules_amount) {
-    EVENTBUS.modules_amount = modules_amount;
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     EVENTBUS.registry = calloc(EVENTBUS.modules_amount, sizeof(module_base*));
     if (!EVENTBUS.registry) {

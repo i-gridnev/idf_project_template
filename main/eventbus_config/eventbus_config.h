@@ -14,4 +14,11 @@ enum {
     MODULES_MAX,
 };
 
+enum {
+    CONFIG_WIFI_SSID = 0,
+    CONFIG_WIFI_PASSWORD,
+
+    CONFIG_MAX,
+};
+
 #endif /* _EVENTBUS_CONFIG_H_ */
