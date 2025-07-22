@@ -5,6 +5,10 @@
 
 #define TAG "EVENTBUS"
 
+#define EVENT_QUEUE_SIZE 20
+#define EVENT_TASK_PRIO  5
+#define EVENT_TASK_CORE  1
+
 typedef struct {
     module_base** registry;
     size_t modules_amount;
@@ -28,10 +32,10 @@ eventbus_task(void* params) {
         if (xQueueReceive(EVENTBUS.event_queue, &event, 1)) {
             subscription_t* sub;
             SLIST_FOREACH(sub, &event.issuer->subscriptions.on_evt[event.id], next) {
-                sub->module->event_handler(event.issuer, &event);
+                sub->module->event_handler(sub->module, &event);
             }
             if (event.payload.free_fcn) {
-                event.payload.free_fcn(event.payload.data);
+                event.payload.free_fcn(event.payload.data.ptr);
             }
         }
     }

@@ -1,5 +1,5 @@
 #include <config_storage.h>
-#include <eventbus_config.h>
+#include <device_config.h>
 #include "string.h"
 
 config_entry_t DEVICE_CONFIG[CONFIG_MAX] = {

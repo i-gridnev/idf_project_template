@@ -8,11 +8,12 @@
 
 typedef struct event event_t;
 typedef struct module_base module_base;
+typedef esp_err_t (*event_handler)(module_base* self, event_t* event);;
 
 typedef struct {
     int id;
     size_t max_evts;
-    esp_err_t (*event_handler)(module_base* self, event_t* event);
+    event_handler event_handler;
 } module_base_config_t;
 
 typedef struct subscription {

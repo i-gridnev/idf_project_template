@@ -11,7 +11,6 @@
 #include "esp_err.h"
 
 #include "bus_module.h"
-#include "eventbus_config.h"
 
 #define ANY_MODULE_ID -1
 
@@ -20,7 +19,15 @@ typedef struct event {
     module_base* issuer;
 
     struct {
-        void* data;
+        union sruct {
+            void* ptr;
+            char* str;
+            int i32;
+            uint16_t u16;
+            float f32;
+            bool b;
+        } data;
+
         size_t size;
         void (*free_fcn)(void* data);
     } payload;

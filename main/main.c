@@ -5,7 +5,9 @@
 #include "nvs_flash.h"
 
 #include "config_storage.h"
+#include <device_config.h>
 #include "eventbus.h"
+#include "web_ui.h"
 #include "wifi_network.h"
 
 /* ==== heap memory watch (testing) ==== */
@@ -33,13 +35,12 @@ app_main(void) {
     };
     wifi_network_create(MODULE_WIFI_NET, &wifi_con);
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    web_ui_create(MODULE_WEB_UI);
 
     wifi_network_STA_connect(CONFIG[CONFIG_WIFI_SSID].value.data.str, CONFIG[CONFIG_WIFI_PASSWORD].value.data.str);
-    if (wifi_network_await_STA_connect(5000)) {
-        ESP_LOGI(TAG, "Happy!");
-    } else {
+    if (!wifi_network_await_STA_connect(5000)) {
         ESP_LOGI(TAG, "FAILLED");
+        wifi_network_STA_disconnect();
     }
 
     // while (1) {

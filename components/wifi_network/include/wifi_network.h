@@ -19,11 +19,6 @@ enum {
     EVT_WIFI_MAX,
 };
 
-//=========== Payload definition ===============
-
-typedef bool evt_wifi_sta_connection;
-typedef bool evt_wifi_sta_trying;
-
 //==============================================
 
 typedef struct {
@@ -32,9 +27,7 @@ typedef struct {
     int reconnect_attempts;
 } wifi_network_config_t;
 
-typedef void* wifi_network_module;
-
-wifi_network_module* wifi_network_create(int id, wifi_network_config_t* config);
+module_base* wifi_network_create(int id, wifi_network_config_t* config);
 
 esp_err_t wifi_network_STA_connect(char* STA_ssid, char* STA_pass);
 bool wifi_network_await_STA_connect(int timeout_ms);

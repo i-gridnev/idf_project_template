@@ -32,7 +32,7 @@ _report(int id, bool success) {
     event_t evt = {0};
     evt.issuer = &WIFI.module;
     evt.id = id;
-    evt.payload.data = (void*)success;
+    evt.payload.data.b = success;
     eventbus_post_event(&evt);
 }
 
@@ -121,8 +121,7 @@ wifi_network_handler(module_base* self, event_t* event) {
 
 esp_err_t
 wifi_network_STA_connect(char* STA_ssid, char* STA_pass) {
-    // if (_get_status(STATUS_STA_DISCONNECTED) && !_get_status(STATUS_STA_TRYING)) {
-
+    wifi_network_STA_disconnect();
     esp_wifi_set_mode(WIFI_MODE_STA);
     wifi_config_t wifi_sta_config = {0};
     esp_wifi_get_config(WIFI_IF_STA, &wifi_sta_config);
@@ -143,8 +142,6 @@ wifi_network_STA_connect(char* STA_ssid, char* STA_pass) {
     xEventGroupSetBits(WIFI.status, STATUS_STA_TRYING);
     _report(EVT_WIFI_STA_TRYING, true);
     return esp_wifi_connect();
-    // }
-    // return ESP_OK;
 }
 
 esp_err_t
@@ -173,7 +170,7 @@ wifi_network_await_STA_disconnect(int timeout_ms) {
     return (STATUS_STA_DISCONNECTED & _await_status(STATUS_STA_DISCONNECTED, timeout_ms * configTICK_RATE_HZ / 1000U));
 }
 
-wifi_network_module*
+module_base*
 wifi_network_create(int id, wifi_network_config_t* config) {
     WIFI.status = xEventGroupCreate();
     module_base_config_t base_config = {
@@ -208,5 +205,5 @@ wifi_network_create(int id, wifi_network_config_t* config) {
 
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(eventbus_module_register(&WIFI.module));
-    return (wifi_network_module*)&WIFI;
+    return &WIFI.module;
 }
