@@ -5,7 +5,8 @@
 #include "nvs_flash.h"
 
 #include "config_storage.h"
-#include <device_config.h>
+#include "device_config.h"
+#include "digital_pin.h"
 #include "eventbus.h"
 #include "web_ui.h"
 #include "wifi_network.h"
@@ -42,6 +43,16 @@ app_main(void) {
         ESP_LOGI(TAG, "FAILLED");
         wifi_network_STA_disconnect();
     }
+
+    digital_pin_config_t btn_cnf = {
+        .gpio = 0,
+        .active_level = 0,
+        .disable_pull = false,
+        .long_press_time = 2000,
+        .short_press_time = 180,
+        .init_state = false,
+    };
+    digital_pin_create(MODULE_DI_BTN, &btn_cnf);
 
     // while (1) {
     //     vTaskDelay(pdMS_TO_TICKS(2000));

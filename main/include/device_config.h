@@ -6,7 +6,7 @@
 enum {
     MODULE_WIFI_NET = 0,
     MODULE_WEB_UI,
-    MODULE_3,
+    MODULE_DI_BTN,
     MODULE_4,
     MODULE_5,
     MODULES_MAX,
