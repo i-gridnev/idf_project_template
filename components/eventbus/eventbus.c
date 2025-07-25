@@ -3,7 +3,7 @@
 
 #include "eventbus.h"
 
-#define TAG "EVENTBUS"
+#define TAG              "EVENTBUS"
 
 #define EVENT_QUEUE_SIZE 20
 #define EVENT_TASK_PRIO  5
@@ -31,8 +31,13 @@ eventbus_task(void* params) {
     while (true) {
         if (xQueueReceive(EVENTBUS.event_queue, &event, 1)) {
             subscription_t* sub;
-            SLIST_FOREACH(sub, &event.issuer->subscriptions.on_evt[event.id], next) {
-                sub->module->event_handler(sub->module, &event);
+            SLIST_FOREACH(sub, &event.issuer->subscriptions[event.id], next) {
+                if (sub->module->event_handler != NULL) {
+                    esp_err_t err = sub->module->event_handler(sub->module, &event);
+                    if (err != ESP_OK) {
+                        ESP_LOGW(TAG, "event id=%d handling err=%d(%s)", event.id, err, esp_err_to_name(err));
+                    }
+                }
             }
             if (event.payload.free_fcn) {
                 event.payload.free_fcn(event.payload.data.ptr);

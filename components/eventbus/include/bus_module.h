@@ -8,7 +8,7 @@
 
 typedef struct event event_t;
 typedef struct module_base module_base;
-typedef esp_err_t (*event_handler)(module_base* self, event_t* event);;
+typedef esp_err_t (*event_handler)(module_base* self, event_t* event);
 
 typedef struct {
     int id;
@@ -25,13 +25,9 @@ SLIST_HEAD(subscription_head, subscription);
 
 struct module_base {
     int id;
-
-    struct {
-        struct subscription_head* on_evt;
-        size_t size;
-    } subscriptions;
-
-    esp_err_t (*event_handler)(module_base* self, event_t* event);
+    size_t size;
+    event_handler event_handler;
+    struct subscription_head* subscriptions;
 };
 
 esp_err_t module_create(module_base* self, module_base_config_t* config);

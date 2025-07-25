@@ -115,11 +115,6 @@ _system_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* 
 }
 
 esp_err_t
-wifi_network_handler(module_base* self, event_t* event) {
-    return ESP_OK;
-}
-
-esp_err_t
 wifi_network_STA_connect(char* STA_ssid, char* STA_pass) {
     wifi_network_STA_disconnect();
     esp_wifi_set_mode(WIFI_MODE_STA);
@@ -176,7 +171,7 @@ wifi_network_create(int id, wifi_network_config_t* config) {
     module_base_config_t base_config = {
         .id = id,
         .max_evts = EVT_WIFI_MAX,
-        .event_handler = wifi_network_handler,
+        .event_handler = NULL,
     };
     ESP_ERROR_CHECK(module_create(&WIFI.module, &base_config));
 
