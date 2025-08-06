@@ -5,3 +5,6 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="app_partition.csv"
 
 # PSRAM
 CONFIG_SPIRAM=y
+
+# Button long click hold report interval
+CONFIG_BUTTON_LONG_PRESS_HOLD_SERIAL_TIME_MS=200

@@ -44,4 +44,6 @@ esp_err_t webserver_stop(module_base* self);
 
 esp_err_t webserver_enqueue_response(webserver_action_t* response);
 
+bool is_webserver_started(module_base* self);
+
 #endif /* _WEBSERVER_H_ */

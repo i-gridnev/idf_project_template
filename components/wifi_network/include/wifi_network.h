@@ -13,6 +13,7 @@
 #include "eventbus.h"
 
 enum {
+    EVT_WIFI_READY,
     EVT_WIFI_STA_CONNECTION,
     EVT_WIFI_STA_TRYING,
     //////////////////////////////
@@ -25,11 +26,13 @@ typedef struct {
     wifi_mode_t mode;
     int reconnect_interval_ms;
     int reconnect_attempts;
+    event_handler event_handler;
 } wifi_network_config_t;
 
 module_base* wifi_network_create(int id, wifi_network_config_t* config);
 
 esp_err_t wifi_network_STA_connect(char* STA_ssid, char* STA_pass);
+
 bool wifi_network_await_STA_connect(int timeout_ms);
 
 esp_err_t wifi_network_STA_disconnect();

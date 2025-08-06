@@ -29,10 +29,13 @@ static wifi_network_module_obj WIFI;
 
 static void
 _report(int id, bool success) {
-    event_t evt = {0};
-    evt.issuer = &WIFI.module;
-    evt.id = id;
-    evt.payload.data.b = success;
+    event_t evt = {
+        .issuer = &WIFI.module,
+        .id = id,
+        .payload.data.b = success,
+        .payload.size = sizeof(bool),
+        .payload.free_fcn = NULL,
+    };
     eventbus_post_event(&evt);
 }
 
@@ -57,8 +60,8 @@ static void
 _system_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
-            case WIFI_EVENT_STA_START: ESP_LOGW(TAG, "STA_START"); break;
-            case WIFI_EVENT_STA_STOP: ESP_LOGW(TAG, "STA_STOP"); break;
+            case WIFI_EVENT_STA_START: _report(EVT_WIFI_READY, true); break;
+            case WIFI_EVENT_STA_STOP: _report(EVT_WIFI_READY, false); break;
             case WIFI_EVENT_STA_DISCONNECTED:
                 ESP_LOGW(TAG, "STA_DISCONNECTED");
                 xEventGroupClearBits(WIFI.status, STATUS_STA_CONNECTED);
@@ -171,9 +174,9 @@ wifi_network_create(int id, wifi_network_config_t* config) {
     module_base_config_t base_config = {
         .id = id,
         .max_evts = EVT_WIFI_MAX,
-        .event_handler = NULL,
+        .event_handler = config->event_handler,
     };
-    ESP_ERROR_CHECK(module_create(&WIFI.module, &base_config));
+    ESP_ERROR_CHECK(eventbus_module_register(&WIFI.module, &base_config));
 
     ESP_ERROR_CHECK(esp_netif_init());
     if (config->mode == WIFI_MODE_STA) {
@@ -199,6 +202,5 @@ wifi_network_create(int id, wifi_network_config_t* config) {
     esp_timer_create(&timer_args, &WIFI.reconnect_timer);
 
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(eventbus_module_register(&WIFI.module));
     return &WIFI.module;
 }

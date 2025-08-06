@@ -1,8 +1,10 @@
+#include <config_storage.h>
 #include <device_config.h>
 #include <esp_log.h>
 #include <eventbus.h>
-#include <web_ui.h>
 #include <wifi_network.h>
+
+#include <web_logic.h>
 
 #define TAG "UI"
 
@@ -46,22 +48,43 @@ ui_handler(module_base* self, event_t* event) {
                 ESP_LOGW(TAG, "EVT_WEBSERVER_OFF");
             }
         }
-    } else if (event->issuer->id == MODULE_WIFI_NET) {
-        if (event->id == EVT_WIFI_STA_CONNECTION) {
-            err = webserver_start_http(self, URIS, sizeof(URIS) / sizeof(URIS[0]));
+    }
+    return err;
+}
+
+esp_err_t
+wifi_handler(module_base* self, event_t* event) {
+    esp_err_t err = ESP_OK;
+    if (event->id == EVT_WIFI_STA_CONNECTION) {
+        module_base* web = eventbus_module_get(MODULE_WEB_UI);
+        if (event->payload.data.b) {
+            if (!is_webserver_started(web)) {
+                err = webserver_start_http(web, URIS, sizeof(URIS) / sizeof(URIS[0]));
+            }
+        } else {
+            ESP_LOGW(TAG, "Wifi off, web is still alive");
         }
     }
     return err;
 }
 
-void
-web_ui_create(int id) {
+esp_err_t
+web_logic() {
     webserver_config_t config = {
         .max_open_sockets = 7,
         .event_handler = ui_handler,
         // .inactive_shutdown_ms = 15 * 1000,
         .inactive_shutdown_ms = 0,
     };
-    module_base* WEB = webserver_create(id, &config, sizeof(URIS) / sizeof(URIS[0]));
-    module_subscribe(WEB, MODULE_WIFI_NET, EVT_WIFI_STA_CONNECTION);
+    webserver_create(MODULE_WEB_UI, &config, sizeof(URIS) / sizeof(URIS[0]));
+
+    wifi_network_config_t wifi_con = {
+        .mode = WIFI_MODE_STA,
+        .reconnect_attempts = 3,
+        .reconnect_interval_ms = 7000,
+        .event_handler = wifi_handler,
+    };
+    module_base* wifi = wifi_network_create(MODULE_WIFI_NET, &wifi_con);
+
+    return eventbus_module_subscribe(wifi, wifi->id, EVT_WIFI_STA_CONNECTION);
 }

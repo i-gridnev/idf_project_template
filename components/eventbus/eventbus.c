@@ -23,6 +23,21 @@ static eventbus_t EVENTBUS;
 //===============================================================================//
 //================================= Private =====================================//
 //===============================================================================//
+esp_err_t
+module_create(module_base* self, module_base_config_t* config) {
+    self->id = config->id;
+    self->size = config->max_evts;
+    self->event_handler = config->event_handler;
+
+    self->subscriptions = malloc(self->size * sizeof(struct subscription_head));
+    if (!self->subscriptions) {
+        return ESP_ERR_NO_MEM;
+    }
+    for (int i = 0; i < self->size; i++) {
+        SLIST_INIT(&self->subscriptions[i]);
+    };
+    return ESP_OK;
+}
 
 static void
 eventbus_task(void* params) {
@@ -35,7 +50,8 @@ eventbus_task(void* params) {
                 if (sub->module->event_handler != NULL) {
                     esp_err_t err = sub->module->event_handler(sub->module, &event);
                     if (err != ESP_OK) {
-                        ESP_LOGW(TAG, "event id=%d handling err=%d(%s)", event.id, err, esp_err_to_name(err));
+                        ESP_LOGW(TAG, "event id=%d issuer=%d handling err=%d(%s)", event.id, event.issuer->id, err,
+                                 esp_err_to_name(err));
                     }
                 }
             }
@@ -72,17 +88,21 @@ eventbus_init(size_t modules_amount) {
 }
 
 esp_err_t
-eventbus_module_register(module_base* module) {
-    if (module->id < 0 || module->id > EVENTBUS.modules_amount) {
-        ESP_LOGE(TAG, "unknown id %d", module->id);
-        return ESP_FAIL;
+eventbus_module_register(module_base* module, module_base_config_t* config) {
+    esp_err_t err = ESP_OK;
+    if (config->id < 0 || config->id > EVENTBUS.modules_amount) {
+        ESP_LOGE(TAG, "unknown id %d", config->id);
+        err = ESP_FAIL;
+    } else if (EVENTBUS.registry[config->id]) {
+        ESP_LOGE(TAG, "already exist id %d", config->id);
+        err = ESP_ERR_INVALID_ARG;
+    } else {
+        err = module_create(module, config);
+        if (err == ESP_OK) {
+            EVENTBUS.registry[module->id] = module;
+        }
     }
-    if (EVENTBUS.registry[module->id]) {
-        ESP_LOGE(TAG, "already exist id %d", module->id);
-        return ESP_FAIL;
-    }
-    EVENTBUS.registry[module->id] = module;
-    return ESP_OK;
+    return err;
 }
 
 module_base*
@@ -92,6 +112,26 @@ eventbus_module_get(int id) {
         return NULL;
     }
     return EVENTBUS.registry[id];
+}
+
+esp_err_t
+eventbus_module_subscribe(module_base* self, int target_id, int evt_id) {
+    module_base* addressee = eventbus_module_get(target_id);
+    if (!addressee) {
+        ESP_LOGE(TAG, "sub addressee not found for id %d", target_id);
+        return ESP_FAIL;
+    }
+    if (evt_id > addressee->size) {
+        ESP_LOGE(TAG, "unknown sub event id %d", evt_id);
+        return ESP_FAIL;
+    }
+    subscription_t* new_sub = malloc(sizeof(subscription_t));
+    if (!new_sub) {
+        return ESP_ERR_NO_MEM;
+    }
+    new_sub->module = self;
+    SLIST_INSERT_HEAD(&addressee->subscriptions[evt_id], new_sub, next);
+    return ESP_OK;
 }
 
 esp_err_t

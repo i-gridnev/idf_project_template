@@ -22,7 +22,7 @@ typedef struct {
     webserver_config_t server_config;
     httpd_ssl_config_t https_config;
     esp_timer_handle_t shutdown_timer;
-
+    bool is_started;
 } webserver_t;
 
 static char*
@@ -171,7 +171,7 @@ webserver_start_http(module_base* self, webserver_uri_t* uri_array, size_t uri_a
                     .handler = base_handler,
                     .user_ctx = (void*)(i + EVT_WEBSERVER_USER_URI), // (!) should be EVENT_ID
                 };
-                ESP_LOGI(TAG, "register uri='%s' event='%d'", uri.uri, i);
+                ESP_LOGI(TAG, "register uri='%s'", uri.uri);
                 err = httpd_register_uri_handler(webserver->server, &uri);
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to register uri='%s'", uri.uri);
@@ -179,6 +179,7 @@ webserver_start_http(module_base* self, webserver_uri_t* uri_array, size_t uri_a
                 }
             }
             if (err == ESP_OK) {
+                webserver->is_started = true;
                 event_t evt = {
                     .id = EVT_WEBSERVER_ONOFF,
                     .issuer = self,
@@ -192,6 +193,12 @@ webserver_start_http(module_base* self, webserver_uri_t* uri_array, size_t uri_a
         }
     }
     return err;
+}
+
+bool
+is_webserver_started(module_base* self) {
+    webserver_t* webserver = (webserver_t*)self;
+    return webserver->is_started;
 }
 
 esp_err_t
@@ -222,12 +229,12 @@ webserver_create(int id, webserver_config_t* config, size_t uri_amount) {
         .max_evts = uri_amount + EVT_WEBSERVER_USER_URI,
         .event_handler = webserver->server_config.event_handler,
     };
-    ESP_ERROR_CHECK(module_create(&webserver->module, &base_config));
-    ESP_ERROR_CHECK(eventbus_module_register(&webserver->module));
-    for (int i = 0; i < uri_amount + EVT_WEBSERVER_USER_URI; i++) {
-        module_subscribe(&webserver->module, id, i); // Subscribe on itself
-    }
 
+    ESP_ERROR_CHECK(eventbus_module_register(&webserver->module, &base_config));
+
+    for (int i = 0; i < uri_amount + EVT_WEBSERVER_USER_URI; i++) {
+        eventbus_module_subscribe(&webserver->module, id, i); // Subscribe on itself
+    }
     httpd_ssl_config_t ssl_cnf = HTTPD_SSL_CONFIG_DEFAULT();
     memcpy(&webserver->https_config, &ssl_cnf, sizeof(httpd_ssl_config_t));
     webserver->https_config.httpd.max_open_sockets = webserver->server_config.max_open_sockets;

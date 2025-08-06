@@ -19,32 +19,39 @@ typedef enum {
     DIGITAL_PIN_TYPE_OUTPUT_INVERSE,
 } digital_pin_type;
 
-typedef union {
-    struct {
-        int32_t gpio;
-        uint8_t active_level; /**< gpio level when press down */
-        bool disable_pull;    /**< disable internal pull up or down */
-        uint16_t long_press_time;
-        uint16_t short_press_time;
-    } button;
+typedef struct {
+    digital_pin_type type;
+    event_handler event_handler;
 
-    struct {
-        int32_t gpio;
-        uint8_t active_level; /**< gpio level when press down */
-        bool disable_pull;    /**< disable internal pull up or down */
-    } input;
+    union {
+        struct {
+            int32_t gpio;
+            uint8_t active_level; /**< gpio level when press down */
+            bool disable_pull;    /**< disable internal pull up or down */
+            uint16_t long_press_time;
+            uint16_t short_press_time;
+        } button;
 
-    struct {
-        int32_t gpio;
-        bool state;
-    } output;
+        struct {
+            int32_t gpio;
+            uint8_t active_level; /**< gpio level when press down */
+            bool disable_pull;    /**< disable internal pull up or down */
+        } input;
+
+        struct {
+            int32_t gpio;
+            bool state;
+        } output;
+    } opt;
 } digital_pin_config_t;
 
-module_base* digital_pin_create(int id, digital_pin_type type, digital_pin_config_t* config);
+module_base* digital_pin_create(int id, digital_pin_config_t* config);
 
 esp_err_t digital_pin_report_now(module_base* digital_pin);
 
-bool digital_pin_get(module_base* digital_pin);
+bool digital_pin_get_state(module_base* digital_pin);
+
+digital_pin_type digital_pin_get_type(module_base* digital_pin);
 
 esp_err_t digital_pin_set(module_base* digital_pin, bool new_state);
 

@@ -1,7 +1,5 @@
-#ifndef _WEB_UI_H_
-#define _WEB_UI_H_
-
-#include "esp_err.h"
+#ifndef _WEB_LOGIC_H_
+#define _WEB_LOGIC_H_
 
 #include <webserver.h>
 
@@ -10,6 +8,6 @@ enum {
     EVT_WEBSERVER_UI_MAX,
 };
 
-void web_ui_create(int id);
+esp_err_t web_logic();
 
-#endif /* _WEB_UI_H_ */
+#endif /* _WEB_LOGIC_H_ */
