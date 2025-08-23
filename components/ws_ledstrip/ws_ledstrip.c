@@ -11,168 +11,203 @@
 #define LED_STRIP_RMT_RES_HZ         (10 * 1000 * 1000)
 #define LED_STRIP_MEMORY_BLOCK_WORDS 1024 // this determines the DMA block size if DMA is avaliable
 
-#define LED_BLINK_TICK_FRAME_MS      200
-#define LOCK_MAX_MS                  500
+#define LED_MANAGER_TASK_STACK       4096
+#define LED_MANAGER_TASK_PRIO        5
+#define LED_MANAGER_TASK_CORE        1
+#define LED_MANAGER_TICK_MS          20
+#define LED_MANAGER_QUEUE_TIMEOUT_MS 50
+#define LED_MANAGER_QUEUE_SIZE       50
+
+#define LOCK_MAX_MS                  100
 
 typedef struct {
     led_state_t state;
+    led_state_t target_state;
 
-    struct {
-        bool need_blink;
-        bool is_on;
-        int tick_counter;
-        int on_ticks;
-        int off_ticks;
-    } blink;
+    int tick_counter;
+    struct blink blink;
+    struct fade fade;
 } ws_led_t;
 
 typedef struct {
-    module_base module;
     ws_ledstrip_config_t config;
     led_strip_handle_t handle;
-    ws_led_t* led_registry;
-    esp_timer_handle_t blink_timer;
-    SemaphoreHandle_t lock;
+    ws_led_t* leds;
 } ws_ledstrip_t;
 
-// static esp_err_t
-// _set_led(led_strip_handle_t handle, int id, uint32_t red, uint32_t green, uint32_t blue) {
-//     esp_err_t err = led_strip_set_pixel(handle, id, red, green, blue);
-//     if (err != ESP_OK) {
-//         ESP_LOGE(TAG, "Failed to set led id=%d, err=%d(%s)", id, err, esp_err_to_name(err));
-//         return err;
-//     }
-//     err = led_strip_refresh(handle);
-//     if (err != ESP_OK) {
-//         ESP_LOGE(TAG, "Failed to refresh strip err=%d(%s)", err, esp_err_to_name(err));
-//     }
-//     return err;
-// }
+typedef struct {
+    module_base module;
+    ws_ledstrip_manager_config_t config;
+    ws_ledstrip_t* stripes;
+    TaskHandle_t task;
+    QueueHandle_t queue;
+    esp_timer_handle_t timer;
+} ws_ledstrip_manager_t;
+
+ws_ledstrip_manager_t MANAGER;
+
+static bool
+_valid_strip_and_led(int strip_id, int led_id) {
+    if (strip_id >= MANAGER.config.strips_amount) {
+        ESP_LOGE(TAG, "invalid strip id %d", strip_id);
+        return false;
+    }
+    if (led_id >= MANAGER.stripes[strip_id].config.leds_amount) {
+        ESP_LOGE(TAG, "invalid led id %d in strip id %d", led_id, strip_id);
+        return false;
+    }
+    return true;
+}
 
 esp_err_t
-ws_ledstrip_reset_all(module_base* self) {
-    ws_ledstrip_t* strip = (ws_ledstrip_t*)self;
-    esp_err_t err = ESP_FAIL;
-    if (xSemaphoreTake(strip->lock, pdMS_TO_TICKS(LOCK_MAX_MS)) == pdTRUE) {
-        for (int i = 0; i < strip->config.leds_amount; i++) {
-            ws_led_t* led = &strip->led_registry[i];
-            led->blink.need_blink = false;
-            led->blink.tick_counter = 0;
-            led->blink.is_on = 0;
-            led->state.opt.red = 0;
-            led->state.opt.green = 0;
-            led->state.opt.blue = 0;
-        }
-        err = led_strip_clear(strip->handle);
-        xSemaphoreGive(strip->lock);
+ws_ledstrip_send_cmd(led_cmd_t* cmd) {
+    if (!_valid_strip_and_led(cmd->strip_id, cmd->led_id)) {
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = ESP_OK;
+    BaseType_t ret = xQueueSend(MANAGER.queue, cmd, pdMS_TO_TICKS(LED_MANAGER_QUEUE_TIMEOUT_MS));
+    if (ret != pdTRUE) {
+        ESP_LOGE(TAG, "manager queue is full, led cmd skipped!");
+        err = ESP_FAIL;
     }
     return err;
 }
 
-esp_err_t
-ws_ledstrip_set_led(module_base* self, led_state_t state) {
-    ws_ledstrip_t* strip = (ws_ledstrip_t*)self;
-    esp_err_t err = ESP_FAIL;
+bool
+_update_active_state(ws_ledstrip_t* strip, int led_id) {
+    ws_led_t* led = &strip->leds[led_id];
+    bool need_update = false;
+    led->tick_counter++;
+    if (led->state.opt.status == LED_BLINK) {
 
-    if (xSemaphoreTake(strip->lock, pdMS_TO_TICKS(LOCK_MAX_MS)) == pdTRUE) {
-        ws_led_t* led = &strip->led_registry[state.opt.index];
-        led->blink.need_blink = false;
-        led->blink.tick_counter = 0;
-        led->state = state;
-
-        err = led_strip_set_pixel(strip->handle, state.opt.index, state.opt.red, state.opt.green, state.opt.blue);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to set led id=%d, err=%d(%s)", state.opt.index, err, esp_err_to_name(err));
-            return err;
-        }
-        err = led_strip_refresh(strip->handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to refresh strip err=%d(%s)", err, esp_err_to_name(err));
-        }
-        xSemaphoreGive(strip->lock);
-    } else {
-        ESP_LOGE(TAG, "Failed led set, too busy");
+    } else if (led->state.opt.status == LED_FADE) {
     }
-
-    return err;
+    return need_update;
 }
 
-esp_err_t
-ws_ledstrip_set_led_blink(module_base* self, led_state_t state, int on_ms, int off_ms, bool start_with) {
-    ws_ledstrip_t* strip = (ws_ledstrip_t*)self;
-    esp_err_t err = ESP_FAIL;
-    if (xSemaphoreTake(strip->lock, pdMS_TO_TICKS(LOCK_MAX_MS)) == pdTRUE) {
-        ws_led_t* led = &strip->led_registry[state.opt.index];
-
-        led->state = state;
-        led->blink.need_blink = true;
-        led->blink.tick_counter = 0;
-        led->blink.on_ticks = on_ms / LED_BLINK_TICK_FRAME_MS;
-        led->blink.off_ticks = off_ms / LED_BLINK_TICK_FRAME_MS;
-
-        if (start_with) {
-            led->blink.is_on = true;
-            err = led_strip_set_pixel(strip->handle, state.opt.index, state.opt.red, state.opt.green, state.opt.blue);
-        } else {
-            led->blink.is_on = false;
-            err = led_strip_set_pixel(strip->handle, state.opt.index, 0, 0, 0);
+bool
+_update_to_new_state(ws_ledstrip_t* strip, int led_id) {
+    ws_led_t* led = &strip->leds[led_id];
+    bool need_update = false;
+    if (led->state.opt.status != led->target_state.opt.status) {
+        need_update = true;
+        switch (led->target_state.opt.status) {
+            case LED_OFF:
+            case LED_ON:
+            case LED_BLINK:
+                esp_err_t err = led_strip_set_pixel(strip->handle, led_id, led->target_state.opt.red,
+                                                    led->target_state.opt.green, led->target_state.opt.blue);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to upd led id=%d, err=%d(%s)", led_id, err, esp_err_to_name(err));
+                } else {
+                    led->state._raw_value = led->target_state._raw_value;
+                }
+                break;
         }
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to set led id=%d, err=%d(%s)", state.opt.index, err, esp_err_to_name(err));
-        }
-        err = led_strip_refresh(strip->handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to refresh strip err=%d(%s)", err, esp_err_to_name(err));
-        }
-
-        xSemaphoreGive(strip->lock);
-    } else {
-        ESP_LOGE(TAG, "Failed led set, too busy");
     }
-    return err;
+    return need_update;
+}
+
+void
+_update_on_tick() {
+    for (int i = 0; i < MANAGER.config.strips_amount; i++) {
+        ws_ledstrip_t* strip = &MANAGER.stripes[i];
+        if (!strip) {
+            continue;
+        }
+        bool need_update = false;
+        for (int y = 0; y < strip->config.leds_amount; y++) {
+            need_update |= _update_active_state(strip, y);
+            need_update |= _update_to_new_state(strip, y);
+        }
+        if (need_update) {
+            ESP_LOGW(TAG, "upd");
+            led_strip_refresh(strip->handle);
+        }
+    }
 }
 
 static void
-_strip_timer_callback(void* arg) {
-    ws_ledstrip_t* strip = (ws_ledstrip_t*)arg;
-    if (xSemaphoreTake(strip->lock, pdMS_TO_TICKS(LOCK_MAX_MS)) == pdTRUE) {
-        bool need_refresh = false;
-        for (int i = 0; i < strip->config.leds_amount; i++) {
-            ws_led_t* led = &strip->led_registry[i];
-            if (led->blink.need_blink) {
-                led->blink.tick_counter++;
-                if (led->blink.is_on) {
-                    if (led->blink.tick_counter >= led->blink.on_ticks) {
-                        led->blink.is_on = false;
-                        led->blink.tick_counter = 0;
-                        led_strip_set_pixel(strip->handle, led->state.opt.index, 0, 0, 0);
-                        need_refresh = true;
-                    }
+manager_task(void* arg) {
+    led_cmd_t led_cmd = {0};
+    esp_err_t err = esp_timer_start_periodic(MANAGER.timer, LED_MANAGER_TICK_MS * 1000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "manager timer start err=%d(%s)", err, esp_err_to_name(err));
+        vTaskDelete(NULL);
+        return;
+    }
+    while (true) {
+        xQueueReceive(MANAGER.queue, &led_cmd, portMAX_DELAY);
+        ws_ledstrip_t* strip = &MANAGER.stripes[led_cmd.strip_id];
+        if (strip) {
+            if (led_cmd.type == LED_CMD_TIMER_TICK) {
+                _update_on_tick();
+            } else if (led_cmd.type == LED_CMD_CLEAR_ALL) {
+                esp_err_t err = led_strip_clear(strip->handle);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "strip_clear failed id=%d, err=%d(%s)", led_cmd.strip_id, err, esp_err_to_name(err));
                 } else {
-                    if (led->blink.tick_counter >= led->blink.off_ticks) {
-                        led->blink.is_on = true;
-                        led->blink.tick_counter = 0;
-                        led_strip_set_pixel(strip->handle, led->state.opt.index, led->state.opt.red,
-                                            led->state.opt.green, led->state.opt.blue);
-                        need_refresh = true;
+                    for (int i = 0; i < strip->config.leds_amount; i++) {
+                        ws_led_t* led = &strip->leds[i];
+                        memset(led, 0, sizeof(ws_led_t));
                     }
+                }
+            } else {
+                ws_led_t* led = &strip->leds[led_cmd.led_id];
+                led->tick_counter = 0;
+                led->target_state._raw_value = led_cmd.target_state._raw_value;
+                switch (led_cmd.type) {
+                    case LED_CMD_SET_RGB: led->target_state.opt.status = LED_ON; break;
+                    case LED_CMD_BLINK:
+                        led->target_state.opt.status = LED_BLINK;
+                        memcpy(&led->blink, &led_cmd.cmd_opt.blink, sizeof(struct blink));
+                        break;
+                    case LED_CMD_FADE:
+                        led->target_state.opt.status = LED_FADE;
+                        memcpy(&led->fade, &led_cmd.cmd_opt.fade, sizeof(struct fade));
+                        break;
+                    case LED_CMD_OFF:
+                    default:
+                        led->target_state.opt.status = LED_OFF;
+                        memset(&led, 0, sizeof(ws_led_t));
+                        break;
                 }
             }
         }
-        if (need_refresh) {
-            led_strip_refresh(strip->handle);
-        }
-        xSemaphoreGive(strip->lock);
+        memset(&led_cmd, 0, sizeof(led_cmd_t));
     }
 }
 
-module_base*
-ws_ledstrip_create(int id, ws_ledstrip_config_t* config) {
-    ws_ledstrip_t* strip = calloc(1, sizeof(ws_ledstrip_t));
-    memcpy(&strip->config, config, sizeof(ws_ledstrip_config_t));
+static void
+_timer_callback(void* arg) {
+    led_cmd_t cmd = {.type = LED_CMD_TIMER_TICK};
+    BaseType_t ret = xQueueSend(MANAGER.queue, &cmd, pdMS_TO_TICKS(LED_MANAGER_QUEUE_TIMEOUT_MS));
+    if (ret != pdTRUE) {
+        ESP_LOGE(TAG, "manager queue is full, led cmd skipped!");
+    }
+}
 
-    module_base_config_t base_config = {.id = id, .max_evts = 1, .event_handler = config->event_handler};
-    ESP_ERROR_CHECK(eventbus_module_register(&strip->module, &base_config));
+led_state_t
+ws_ledstrip_get_state(int strip_id, int led_id) {
+    led_state_t state = {0};
+    if (!_valid_strip_and_led(strip_id, led_id)) {
+        return state;
+    }
+    ws_ledstrip_t* strip = &MANAGER.stripes[strip_id];
+    ws_led_t* led = &strip->leds[led_id];
+    state._raw_value = led->state._raw_value;
+    return state;
+}
+
+esp_err_t
+ws_ledstrip_add_strip(int strip_id, ws_ledstrip_config_t* config) {
+    if (strip_id >= MANAGER.config.strips_amount) {
+        ESP_LOGE(TAG, "invalid strip id %d", strip_id);
+        return ESP_FAIL;
+    }
+    ws_ledstrip_t* strip = &MANAGER.stripes[strip_id];
+    memcpy(&strip->config, config, sizeof(ws_ledstrip_config_t));
 
     led_strip_config_t strip_config = {
         .strip_gpio_num = config->gpio,
@@ -192,20 +227,42 @@ ws_ledstrip_create(int id, ws_ledstrip_config_t* config) {
     } else {
         rmt_config.mem_block_symbols = 0;
     }
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &strip->handle));
-
-    strip->led_registry = calloc(config->leds_amount, sizeof(ws_led_t));
-    for (int i = 0; i < config->leds_amount; i++) {
-        strip->led_registry[i].state.opt.index = i;
-    }
-
-    strip->lock = xSemaphoreCreateMutex();
-    const esp_timer_create_args_t timer_args = {.callback = &_strip_timer_callback, .arg = strip};
-    esp_err_t err = esp_timer_create(&timer_args, &strip->blink_timer);
-    err |= esp_timer_start_periodic(strip->blink_timer, LED_BLINK_TICK_FRAME_MS * 1000);
+    esp_err_t err = led_strip_new_rmt_device(&strip_config, &rmt_config, &strip->handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed blink_timer err=%d(%s)", err, esp_err_to_name(err));
-        return NULL;
+        ESP_LOGE(TAG, "failed strip init id %d with err=%d(%s)", strip_id, err, esp_err_to_name(err));
+        return err;
     }
-    return &strip->module;
+    strip->leds = calloc(config->leds_amount, sizeof(ws_led_t));
+    return err;
+}
+
+module_base*
+ws_ledstrip_manager_create(int id, ws_ledstrip_manager_config_t* config) {
+    memcpy(&MANAGER.config, config, sizeof(ws_ledstrip_manager_config_t));
+    MANAGER.stripes = calloc(config->strips_amount, sizeof(ws_ledstrip_t));
+
+    module_base_config_t base_config = {.id = id, .max_evts = 1, .event_handler = config->event_handler};
+    ESP_ERROR_CHECK(eventbus_module_register(&MANAGER.module, &base_config));
+
+    MANAGER.queue = xQueueCreate(LED_MANAGER_QUEUE_SIZE, sizeof(led_cmd_t));
+    if (!MANAGER.queue) {
+        ESP_LOGE(TAG, "manager queue failed");
+        goto onerror;
+    }
+    const esp_timer_create_args_t timer_args = {.callback = &_timer_callback};
+    esp_err_t err = esp_timer_create(&timer_args, &MANAGER.timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "manager timer create err=%d(%s)", err, esp_err_to_name(err));
+        goto onerror;
+    }
+    BaseType_t ret = xTaskCreatePinnedToCore(manager_task, "wsman", LED_MANAGER_TASK_STACK, NULL, LED_MANAGER_TASK_PRIO,
+                                             &MANAGER.task, LED_MANAGER_TASK_CORE);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "manager task failed with err=%d", ret);
+        goto onerror;
+    }
+    return &MANAGER.module;
+onerror:
+    free(MANAGER.stripes);
+    return NULL;
 }
