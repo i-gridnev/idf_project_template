@@ -71,15 +71,14 @@ struct module_base {
 
 esp_err_t eventbus_init();
 
-// esp_err_t eventbus_module_register(module_base* module, module_base_config_t* config);
-
-void eventbus_module_constructor(module_base_t* module, char* name);
-
+void eventbus_module_constructor(module_base_t* base, char* name);
 esp_err_t eventbus_module_add_middleware(module_base_t* module, middleware_handler handler);
 esp_err_t eventbus_module_add_instance(module_base_t* module, instance_base_t* instance);
 instance_base_t* eventbus_module_get_instance(module_base_t* module, int id);
 
+void eventbus_instance_constructor(instance_base_t* base, module_base_t* module, int id);
+esp_err_t eventbus_instance_subscribe(instance_base_t* self, instance_base_t* t, int id, event_handler h);
+
 esp_err_t eventbus_post_event(event_t* event);
-esp_err_t eventbus_subscribe(instance_base_t* self, instance_base_t* target, int event_id, event_handler handler);
 
 #endif /* _EVENTBUS_H_ */
