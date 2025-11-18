@@ -2,7 +2,7 @@
 #include "nvs_flash.h"
 #include "string.h"
 
-#include "config_storage.h"
+#include "config_entry.h"
 
 #define TAG                     "CNF"
 #define FLOAT_STORAGE_PRECISION 10000 // Meaning saved as (int32_t)( val * FLOAT_STORAGE_PRECISION)
@@ -102,6 +102,7 @@ _use_default(nvs_handle_t nvs_handle, config_entry_t* entry) {
         entry->value.data.ptr = (entry->type == CFG_TYPE_STRING) ? calloc(1, entry->default_value.size + 1)
                                                                  : calloc(1, entry->default_value.size);
         memcpy(entry->value.data.ptr, entry->default_value.data.ptr, entry->default_value.size);
+        entry->value.size = entry->default_value.size;
     }
     return _save_entry(nvs_handle, entry);
 }
@@ -111,20 +112,24 @@ _load_entry(nvs_handle_t nvs_handle, config_entry_t* entry) {
     esp_err_t err;
     if (entry->type == CFG_TYPE_INT) {
         err = nvs_get_i32(nvs_handle, entry->tag, (int32_t*)&entry->value.data.i32);
+        entry->value.size = sizeof(int32_t);
     } else if (entry->type == CFG_TYPE_UNT16) {
         err = nvs_get_u16(nvs_handle, entry->tag, &entry->value.data.u16);
+        entry->value.size = sizeof(uint16_t);
     } else if (entry->type == CFG_TYPE_BOOL) {
         int8_t ref;
         err = nvs_get_i8(nvs_handle, entry->tag, &ref);
         if (err == ESP_OK) {
             entry->value.data.b = (bool)ref;
         }
+        entry->value.size = sizeof(bool);
     } else if (entry->type == CFG_TYPE_FLOAT) {
         int32_t raw_value;
         err = nvs_get_i32(nvs_handle, entry->tag, &raw_value);
         if (err == ESP_OK) {
             entry->value.data.f32 = (float)raw_value / FLOAT_STORAGE_PRECISION;
         }
+        entry->value.size = sizeof(float);
     } else if (entry->type == CFG_TYPE_STRING || entry->type == CFG_TYPE_BLOB) {
         size_t required_size;
         err = (entry->type == CFG_TYPE_STRING) ? nvs_get_str(nvs_handle, entry->tag, NULL, &required_size)
@@ -163,41 +168,27 @@ _load_entry(nvs_handle_t nvs_handle, config_entry_t* entry) {
 //===============================================================================//
 
 esp_err_t
-cfg_init(config_entry_t* config, size_t entry_num) {
+_cfg_init(config_entry_t* config, size_t entry_num) {
     nvs_handle_t nvs_handle;
     esp_err_t err = ESP_OK;
     ESP_ERROR_CHECK(_init_nvs());
-    ESP_ERROR_CHECK(_open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle));
-    for (int i = 0; i < entry_num; i++) {
-        if (config[i].type >= CFG_TYPE_BOOL && config[i].type <= CFG_TYPE_UNT16) {
-            config[i].value.data.i32 = 0;
-            if (config[i].type == CFG_TYPE_BOOL) {
-                config[i].value.size = sizeof(bool);
-            } else if (config[i].type == CFG_TYPE_UNT16) {
-                config[i].value.size = sizeof(uint16_t);
-            } else if (config[i].type == CFG_TYPE_FLOAT) {
-                config[i].value.size = sizeof(float);
-            } else if (config[i].type == CFG_TYPE_INT) {
-                config[i].value.size = sizeof(int32_t);
+    if (config != NULL) {
+        ESP_ERROR_CHECK(_open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle));
+        for (int i = 0; i < entry_num; i++) {
+            err = _load_entry(nvs_handle, &config[i]);
+            if (err == ESP_OK) {
+                _print_entry(&config[i]);
+            } else {
+                break;
             }
-        } else if (config[i].type == CFG_TYPE_STRING || config[i].type == CFG_TYPE_BLOB) {
-            config[i].value.data.ptr = NULL;
-            config[i].value.size = 0;
         }
-
-        err = _load_entry(nvs_handle, &config[i]);
-        if (err == ESP_OK) {
-            _print_entry(&config[i]);
-        } else {
-            break;
-        }
+        nvs_close(nvs_handle);
     }
-    nvs_close(nvs_handle);
     return err;
 }
 
 esp_err_t
-cfg_save_entry(config_entry_t* entry) {
+device_cfg_save_entry(config_entry_t* entry) {
     nvs_handle_t nvs_handle;
     esp_err_t err = _open_nvs(CONFIG_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
@@ -216,7 +207,7 @@ cfg_save_entry(config_entry_t* entry) {
 }
 
 esp_err_t
-cfg_reset_entry_to_default(config_entry_t* entry) {
+device_cfg_entry_to_default(config_entry_t* entry) {
     nvs_handle_t nvs_handle;
     esp_err_t err = _open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
@@ -235,7 +226,7 @@ cfg_reset_entry_to_default(config_entry_t* entry) {
 }
 
 esp_err_t
-cfg_reset_all_to_default(config_entry_t* config, size_t entry_num) {
+device_cfg_all_to_default(config_entry_t* config, size_t entry_num) {
     nvs_handle_t nvs_handle;
     esp_err_t err = _open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {

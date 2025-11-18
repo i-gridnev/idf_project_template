@@ -1,29 +1,15 @@
-#ifndef _EVENTBUS_CONFIG_H_
-#define _EVENTBUS_CONFIG_H_
+#ifndef _DEVICE_CONFIG_H_
+#define _DEVICE_CONFIG_H_
 
-enum {
-    MODULE_WIFI_NET = 0,
-    MODULE_WEB_UI,
-    MODULE_DI_BTN,
-    MODULE_LED_MANAGER,
-    MODULES_MAX,
+enum digital_pin_ids {
+    PIN_BTN,
+    PIN_MAX,
 };
 
-enum {
+enum config_entry_ids {
     CONFIG_WIFI_SSID = 0,
     CONFIG_WIFI_PASSWORD,
-
     CONFIG_MAX,
 };
 
-enum {
-    CONFIG_LED_0 = 0,
-    CONFIG_LED_1,
-    CONFIG_LED_2,
-    CONFIG_LED_3,
-    CONFIG_LED_4,
-
-    CONFIG_LED_MAX,
-};
-
-#endif /* _EVENTBUS_CONFIG_H_ */
+#endif /* _DEVICE_CONFIG_H_ */

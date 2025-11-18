@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <config_storage.h>
 #include <device_config.h>
 #include <eventbus.h>
 #include <ws_ledstrip.h>
@@ -22,19 +21,36 @@
 
 #define TAG "APP"
 
+config_entry_t DEVICE_CONFIG[CONFIG_MAX] = {
+    [CONFIG_WIFI_SSID] =
+        {
+            .type = CFG_TYPE_STRING,
+            .name = "wifi_ssid",
+            .tag = "wf_ssid",
+            .default_value.data.str = "",
+            .default_value.size = strlen(""),
+        },
+    [CONFIG_WIFI_PASSWORD] =
+        {
+            .type = CFG_TYPE_STRING,
+            .name = "wifi_password",
+            .tag = "wf_pass",
+            .default_value.data.str = "",
+            .default_value.size = strlen(""),
+        },
+};
+
+config_entry_t* CONFIG = DEVICE_CONFIG;
+
 void
 app_main(void) {
     ESP_LOGI(TAG, "...starting...");
-    /*======= Component initialization block =======*/
     ESP_LOGI(TAG, ":::Initialized RAM: free=%lu, min=%lu", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
+    ESP_ERROR_CHECK(device_init(CONFIG, CONFIG_MAX));
 
-    ESP_ERROR_CHECK(cfg_init(CONFIG, CONFIG_MAX));
-
-    ESP_ERROR_CHECK(eventbus_init(MODULES_MAX));
-
-    ESP_ERROR_CHECK(web_logic());
+    // ESP_ERROR_CHECK(web_logic());
     ESP_ERROR_CHECK(pin_logic());
-    ESP_ERROR_CHECK(led_logic());
+    // ESP_ERROR_CHECK(led_logic());
 
     /*==============================================*/
 

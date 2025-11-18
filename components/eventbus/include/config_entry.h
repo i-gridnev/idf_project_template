@@ -38,12 +38,12 @@ typedef struct {
 
 extern config_entry_t* CONFIG;
 
-esp_err_t cfg_init(config_entry_t* config, size_t entry_num);
+esp_err_t _cfg_init(config_entry_t* config, size_t entry_num);
 
-esp_err_t cfg_save_entry(config_entry_t* entry);
+esp_err_t device_cfg_save_entry(config_entry_t* entry);
 
-esp_err_t cfg_reset_entry_to_default(config_entry_t* entry);
+esp_err_t device_cfg_entry_to_default(config_entry_t* entry);
 
-esp_err_t cfg_reset_all_to_default(config_entry_t* config, size_t entry_num);
+esp_err_t device_cfg_all_to_default(config_entry_t* config, size_t entry_num);
 
 #endif /* _CONFIG_STORAGE_H_ */
