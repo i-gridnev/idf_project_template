@@ -1,0 +1,86 @@
+#include <device_config.h>
+#include <esp_log.h>
+#include <eventbus.h>
+#include <wifi_network.h>
+
+#include <logic.h>
+
+#define TAG "UI"
+
+esp_err_t
+on_root(instance_base_t* subscriber, event_t* event) {
+    extern const unsigned char index_start[] asm("_binary_index_html_start");
+    extern const unsigned char index_end[] asm("_binary_index_html_end");
+    webserver_action_t* request = (webserver_action_t*)event->data;
+    webserver_action_t response = {
+        .req = request->req,
+        .buffer = (char*)index_start,
+        .buffer_size = index_end - index_start,
+        .need_free = false,
+    };
+    httpd_resp_set_type(response.req, HTTPD_TYPE_TEXT);
+    return webserver_enqueue_response(&response);
+}
+
+webserver_uri_t URIS[] = {
+    {
+        .uri = "/",
+        .method = HTTP_GET,
+        .event_id = EVT_WEBSERVER_UI_ON_ROOT,
+        .handler = on_root,
+    },
+};
+
+esp_err_t
+web_activity_handler(instance_base_t* subscriber, event_t* event) {
+    esp_err_t err = ESP_OK;
+    if (event->id == EVT_WEBSERVER_INACTIVE) {
+        ESP_LOGW(TAG, "EVT_WEBSERVER_INACTIVE");
+        err = webserver_stop();
+    } else if (event->id == EVT_WEBSERVER_ON) {
+        ESP_LOGW(TAG, "EVT_WEBSERVER_ON");
+    } else if (event->id == EVT_WEBSERVER_OFF) {
+        ESP_LOGW(TAG, "EVT_WEBSERVER_OFF");
+    }
+    return err;
+}
+
+esp_err_t
+wifi_handler(instance_base_t* subscriber, event_t* event) {
+    esp_err_t err = ESP_FAIL;
+    webserver_component_t* webserver = (webserver_component_t*)subscriber;
+    wifi_event_data_t evt_data = (wifi_event_data_t)event->data;
+
+    if (evt_data.success) {
+        if (!webserver->is_started) {
+            err = webserver_start_http();
+        }
+    } else {
+        ESP_LOGW(TAG, "Wifi off, web is still alive");
+    }
+    return err;
+}
+
+esp_err_t
+web_logic() {
+    webserver_component_config_t web_cfg = {
+        .max_open_sockets = 7,
+        .uris = URIS,
+        .uris_size = sizeof(URIS) / sizeof(URIS[0]),
+        // .inactive_shutdown_ms = 15 * 1000,
+        .inactive_shutdown_ms = 0,
+    };
+    webserver_component_t* webserver = webserver_create(&web_cfg);
+    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_INACTIVE, web_activity_handler);
+    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_ON, web_activity_handler);
+    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_OFF, web_activity_handler);
+
+    wifi_component_config_t wifi_cfg = {
+        .mode = WIFI_MODE_STA,
+        .reconnect_attempts = 3,
+        .reconnect_interval_ms = 7000,
+    };
+    wifi_component_t* wifi_net = wifi_network_create(&wifi_cfg);
+
+    return device_subscribe(&webserver->base, &wifi_net->base, EVT_WIFI_STA_CONNECTION, wifi_handler);
+}

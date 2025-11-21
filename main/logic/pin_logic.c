@@ -1,10 +1,9 @@
-#include <config_entry.h>
 #include <device_config.h>
 #include <esp_log.h>
 #include <eventbus.h>
 #include <wifi_network.h>
 
-#include <pin_logic.h>
+#include <logic.h>
 
 #define TAG "PIN"
 
@@ -13,16 +12,16 @@ pin_handler(instance_base_t* subscriber, event_t* event) {
     esp_err_t err = ESP_OK;
     digital_pin_event_data_t btn_data = (digital_pin_event_data_t)event->data;
     if (event->id == EVT_DIGITAL_PIN_BTN_CLICK) {
-        ESP_LOGI(TAG, "Click %d", btn_data.button.repeat_counter);
-        // if (clicks == 2) {
-        //     bool is_off = is_wifi_network_STA_connected();
-        //     if (!is_off) {
-        //         err = wifi_network_STA_connect(CONFIG[CONFIG_WIFI_SSID].value.data.str,
-        //                                        CONFIG[CONFIG_WIFI_PASSWORD].value.data.str);
-        //     } else {
-        //         err = wifi_network_STA_disconnect();
-        //     }
-        // }
+        uint16_t clicks = btn_data.button.repeat_counter;
+        ESP_LOGI(TAG, "Click %d", clicks);
+        if (clicks == 2) {
+            if (!is_wifi_network_STA_connected()) {
+                err = wifi_network_STA_connect(DEVICE_CONFIG[CONFIG_WIFI_SSID].value.data.str,
+                                               DEVICE_CONFIG[CONFIG_WIFI_PASSWORD].value.data.str);
+            } else {
+                err = wifi_network_STA_disconnect();
+            }
+        }
     } else if (event->id == EVT_DIGITAL_PIN_BTN_LONG_LATCH) {
         uint16_t hold_num = btn_data.button.repeat_counter;
         uint16_t ticks = btn_data.button.ticks_time;

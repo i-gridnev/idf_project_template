@@ -137,6 +137,16 @@ device_module_get_instance(module_base_t* module, int id) {
     return base;
 }
 
+instance_base_t*
+device_module_get_seldcontained_instance(module_base_t* module) {
+    instance_base_t* base = NULL;
+    if (!SLIST_EMPTY(module->instances)) {
+        instance_list_t* solo = SLIST_FIRST(module->instances);
+        base = solo->instance;
+    }
+    return base;
+}
+
 esp_err_t
 device_module_add_middleware(module_base_t* module, middleware_handler handler) {
     esp_err_t err = ESP_OK;
@@ -215,10 +225,9 @@ device_post_event(event_t* event) {
 }
 
 esp_err_t
-device_init(config_entry_t* config_registry, size_t entry_num) {
+device_init() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(_cfg_init(config_registry, entry_num));
-
+    ESP_ERROR_CHECK(_device_cfg_init());
     EVENTBUS.event_queue = xQueueCreateStatic(EVENT_QUEUE_SIZE, sizeof(event_t), __eq_buf, &__eq_struct);
     if (!EVENTBUS.event_queue) {
         return ESP_ERR_NO_MEM;

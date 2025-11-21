@@ -7,11 +7,7 @@
 
 #include <device_config.h>
 #include <eventbus.h>
-#include <ws_ledstrip.h>
-
-#include <led_logic.h>
-#include <pin_logic.h>
-#include <web_logic.h>
+#include <logic.h>
 
 /* ==== heap memory watch (testing) ==== */
 // #include "esp_heap_trace.h"
@@ -21,7 +17,7 @@
 
 #define TAG "APP"
 
-config_entry_t DEVICE_CONFIG[CONFIG_MAX] = {
+config_entry_t CONFIG[CONFIG_MAX] = {
     [CONFIG_WIFI_SSID] =
         {
             .type = CFG_TYPE_STRING,
@@ -39,16 +35,15 @@ config_entry_t DEVICE_CONFIG[CONFIG_MAX] = {
             .default_value.size = strlen(""),
         },
 };
-
-config_entry_t* CONFIG = DEVICE_CONFIG;
+REGISTER_CONFIG(CONFIG, CONFIG_MAX)
 
 void
 app_main(void) {
     ESP_LOGI(TAG, "...starting...");
     ESP_LOGI(TAG, ":::Initialized RAM: free=%lu, min=%lu", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-    ESP_ERROR_CHECK(device_init(CONFIG, CONFIG_MAX));
+    ESP_ERROR_CHECK(device_init());
 
-    // ESP_ERROR_CHECK(web_logic());
+    ESP_ERROR_CHECK(web_logic());
     ESP_ERROR_CHECK(pin_logic());
     // ESP_ERROR_CHECK(led_logic());
 

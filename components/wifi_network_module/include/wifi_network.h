@@ -8,10 +8,19 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 
 #include "eventbus.h"
 
+typedef struct {
+    module_base_t base;
+} wifi_module_t;
+
+extern wifi_module_t* WIFI_MODULE;
+
+//=============================================================//
+//============= EVENT DESCRIPTION =============================//
 enum {
     EVT_WIFI_READY,
     EVT_WIFI_STA_CONNECTION,
@@ -20,16 +29,28 @@ enum {
     EVT_WIFI_MAX,
 };
 
-//==============================================
+typedef union {
+    void* raw;
+    bool success;
+} wifi_event_data_t;
 
+//=============================================================//
+//==================== WIFI ENTITY ============================//
 typedef struct {
     wifi_mode_t mode;
     int reconnect_interval_ms;
     int reconnect_attempts;
-    event_handler event_handler;
-} wifi_network_config_t;
+} wifi_component_config_t;
 
-module_base* wifi_network_create(int id, wifi_network_config_t* config);
+typedef struct {
+    instance_base_t base;
+    wifi_component_config_t config;
+    EventGroupHandle_t status;
+    int connect_attempts;
+    esp_timer_handle_t reconnect_timer;
+} wifi_component_t;
+
+wifi_component_t* wifi_network_create(wifi_component_config_t* config);
 
 esp_err_t wifi_network_STA_connect(char* STA_ssid, char* STA_pass);
 

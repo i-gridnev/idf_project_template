@@ -36,14 +36,19 @@ typedef struct {
     config_value_t default_value;
 } config_entry_t;
 
-extern config_entry_t* CONFIG;
+extern config_entry_t* DEVICE_CONFIG;
+extern size_t DEVICE_CONFIG_SIZE;
 
-esp_err_t _cfg_init(config_entry_t* config, size_t entry_num);
+#define REGISTER_CONFIG(config_array, config_size)                                                                     \
+    config_entry_t* DEVICE_CONFIG = config_array;                                                                      \
+    size_t DEVICE_CONFIG_SIZE = config_size;
+
+esp_err_t _device_cfg_init();
 
 esp_err_t device_cfg_save_entry(config_entry_t* entry);
 
 esp_err_t device_cfg_entry_to_default(config_entry_t* entry);
 
-esp_err_t device_cfg_all_to_default(config_entry_t* config, size_t entry_num);
+esp_err_t device_cfg_all_to_default();
 
 #endif /* _CONFIG_STORAGE_H_ */

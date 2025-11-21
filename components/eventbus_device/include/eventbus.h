@@ -71,15 +71,18 @@ struct module_base {
     struct instance_list_head* instances;
 };
 
+#define SELFCONTAINED_INSTANCE_ID     0
 #define MODULE_INIT(base, namestring) .base = {.name = #namestring, .middlewares = NULL, .instances = NULL}
 
-esp_err_t device_init(config_entry_t* config_registry, size_t entry_num);
+esp_err_t device_init();
 
 esp_err_t device_module_add_middleware(module_base_t* module, middleware_handler handler);
 
 esp_err_t device_module_add_instance(module_base_t* module, instance_base_t* instance);
 
 instance_base_t* device_module_get_instance(module_base_t* module, int id);
+
+instance_base_t* device_module_get_seldcontained_instance(module_base_t* module);
 
 void device_instance_constructor(instance_base_t* base, module_base_t* module, int id);
 

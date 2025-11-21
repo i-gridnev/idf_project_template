@@ -168,16 +168,16 @@ _load_entry(nvs_handle_t nvs_handle, config_entry_t* entry) {
 //===============================================================================//
 
 esp_err_t
-_cfg_init(config_entry_t* config, size_t entry_num) {
+_device_cfg_init() {
     nvs_handle_t nvs_handle;
     esp_err_t err = ESP_OK;
     ESP_ERROR_CHECK(_init_nvs());
-    if (config != NULL) {
+    if (DEVICE_CONFIG != NULL) {
         ESP_ERROR_CHECK(_open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle));
-        for (int i = 0; i < entry_num; i++) {
-            err = _load_entry(nvs_handle, &config[i]);
+        for (int i = 0; i < DEVICE_CONFIG_SIZE; i++) {
+            err = _load_entry(nvs_handle, &DEVICE_CONFIG[i]);
             if (err == ESP_OK) {
-                _print_entry(&config[i]);
+                _print_entry(&DEVICE_CONFIG[i]);
             } else {
                 break;
             }
@@ -226,15 +226,15 @@ device_cfg_entry_to_default(config_entry_t* entry) {
 }
 
 esp_err_t
-device_cfg_all_to_default(config_entry_t* config, size_t entry_num) {
+device_cfg_all_to_default() {
     nvs_handle_t nvs_handle;
     esp_err_t err = _open_nvs(CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         return err;
     }
 
-    for (int i = 0; i < entry_num; i++) {
-        err = _use_default(nvs_handle, &config[i]);
+    for (int i = 0; i < DEVICE_CONFIG_SIZE; i++) {
+        err = _use_default(nvs_handle, &DEVICE_CONFIG[i]);
         if (err != ESP_OK) {
             break;
         }
@@ -244,8 +244,8 @@ device_cfg_all_to_default(config_entry_t* config, size_t entry_num) {
         err = _commit_nvs(nvs_handle, NULL);
         if (err == ESP_OK) {
             ESP_LOGW(TAG, "RESETED TO DEFAULTS");
-            for (int i = 0; i < entry_num; i++) {
-                _print_entry(&config[i]);
+            for (int i = 0; i < DEVICE_CONFIG_SIZE; i++) {
+                _print_entry(&DEVICE_CONFIG[i]);
             }
         }
     }
