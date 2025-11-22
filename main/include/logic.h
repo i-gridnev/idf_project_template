@@ -6,12 +6,11 @@
 
 enum {
     EVT_WEBSERVER_UI_ON_ROOT = EVT_WEBSERVER_USER_URI,
-    EVT_WEBSERVER_UI_MAX,
 };
 
 esp_err_t web_logic();
 
-esp_err_t led_logic();
+// esp_err_t led_logic();
 
 esp_err_t pin_logic();
 

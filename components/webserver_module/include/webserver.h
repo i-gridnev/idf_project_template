@@ -30,10 +30,13 @@ enum {
 
 typedef struct {
     httpd_req_t* req;
-    char* buffer;
-    size_t buffer_size;
-    bool need_free;
-} webserver_action_t;
+
+    struct {
+        char* ptr;
+        size_t size;
+        bool persistent;
+    } buffer;
+} webserver_req_buffer_t;
 
 //=============================================================//
 //==================== WEBSERVER ENTITY =======================//
@@ -68,6 +71,6 @@ esp_err_t webserver_start_http();
 
 esp_err_t webserver_stop();
 
-esp_err_t webserver_enqueue_response(webserver_action_t* response);
+esp_err_t webserver_enqueue_response(webserver_req_buffer_t* response);
 
 #endif /* _WEBSERVER_H_ */

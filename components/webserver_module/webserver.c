@@ -75,11 +75,11 @@ _shutdown_inactivity_timer_callback(void* arg) {
 
 static void
 _free_action(void* data_action) {
-    webserver_action_t* action = (webserver_action_t*)data_action;
-    if (action->need_free) {
-        free(action->buffer);
+    webserver_req_buffer_t* req_buffer = (webserver_req_buffer_t*)data_action;
+    if (!req_buffer->buffer.persistent) {
+        free(req_buffer->buffer.ptr);
     }
-    free(action);
+    free(req_buffer);
 }
 
 static esp_err_t
@@ -97,25 +97,25 @@ base_handler(httpd_req_t* req) {
         ESP_LOGD(TAG, "inactivity updated");
     }
 
-    webserver_action_t* request = calloc(1, sizeof(webserver_action_t));
+    webserver_req_buffer_t* request = calloc(1, sizeof(webserver_req_buffer_t));
     if (httpd_req_async_handler_begin(req, &request->req) != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
         free(request);
         return ESP_FAIL;
     }
     if (req->method != HTTP_GET) {
-        request->buffer = _read_payload_raw(req);
-        if (request->buffer == NULL) { // error codes are handled while read
+        request->buffer.ptr = _read_payload_raw(req);
+        if (request->buffer.ptr == NULL) { // error codes are handled while read
             free(request);
             return ESP_FAIL;
         }
-        request->buffer_size = strlen(request->buffer);
+        request->buffer.size = strlen(request->buffer.ptr);
     }
     event_t evt = {
         .id = (int)request->req->user_ctx,
         .issuer = &webserver->base,
         .data = (void*)request,
-        .data_size = sizeof(webserver_action_t),
+        .data_size = sizeof(webserver_req_buffer_t),
         .data_free_fcn = _free_action,
     };
     return device_post_event(&evt);
@@ -123,8 +123,8 @@ base_handler(httpd_req_t* req) {
 
 static void
 _async_send_handler(void* arg) {
-    webserver_action_t* async_response = (webserver_action_t*)arg;
-    if (_send_chunked(async_response->req, async_response->buffer, async_response->buffer_size) != ESP_OK) {
+    webserver_req_buffer_t* async_response = (webserver_req_buffer_t*)arg;
+    if (_send_chunked(async_response->req, async_response->buffer.ptr, async_response->buffer.size) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send to '%s'", async_response->req->uri);
     }
     if (httpd_req_async_handler_complete(async_response->req) != ESP_OK) {
@@ -140,9 +140,9 @@ _when_httpd_stop(void* global_user_ctx) {
 }
 
 esp_err_t
-webserver_enqueue_response(webserver_action_t* response) {
-    webserver_action_t* async_response = calloc(1, sizeof(webserver_action_t));
-    memcpy(async_response, response, sizeof(webserver_action_t));
+webserver_enqueue_response(webserver_req_buffer_t* response) {
+    webserver_req_buffer_t* async_response = calloc(1, sizeof(webserver_req_buffer_t));
+    memcpy(async_response, response, sizeof(webserver_req_buffer_t));
     return httpd_queue_work(response->req->handle, _async_send_handler, async_response);
 }
 

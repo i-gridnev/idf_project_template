@@ -11,12 +11,10 @@ esp_err_t
 on_root(instance_base_t* subscriber, event_t* event) {
     extern const unsigned char index_start[] asm("_binary_index_html_start");
     extern const unsigned char index_end[] asm("_binary_index_html_end");
-    webserver_action_t* request = (webserver_action_t*)event->data;
-    webserver_action_t response = {
+    webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
+    webserver_req_buffer_t response = {
         .req = request->req,
-        .buffer = (char*)index_start,
-        .buffer_size = index_end - index_start,
-        .need_free = false,
+        .buffer = {.ptr = (char*)index_start, .size = index_end - index_start, .persistent = true},
     };
     httpd_resp_set_type(response.req, HTTPD_TYPE_TEXT);
     return webserver_enqueue_response(&response);

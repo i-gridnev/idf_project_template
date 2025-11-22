@@ -14,6 +14,38 @@
 
 #include <config_entry.h>
 
+// Return pointer to tail item or NULL if list is empty
+#define SLIST_TAIL(head, field)                                                                                        \
+    ({                                                                                                                 \
+        __typeof__(SLIST_FIRST(head)) _it, _last = NULL;                                                               \
+        if (!SLIST_EMPTY(head)) {                                                                                      \
+            SLIST_FOREACH(_it, head, field) { _last = _it; }                                                           \
+        }                                                                                                              \
+        _last;                                                                                                         \
+    })
+
+// Return true if filter got triggered and with a pointer to the item in *res_or_tail*
+// Return false if filter not triggered and *res_or_tail* NULL for case list is empty or a pointer to a tail item
+#define SLIST_GET_WITH_TAIL(head, field, res_or_tail, callback, ctx)                                                   \
+    ({                                                                                                                 \
+        __typeof__(SLIST_FIRST(head)) _it, _last = NULL;                                                               \
+        bool _found = false;                                                                                           \
+        if (!SLIST_EMPTY(head)) {                                                                                      \
+            SLIST_FOREACH(_it, head, field) {                                                                          \
+                _last = _it;                                                                                           \
+                if (callback(_it, ctx)) {                                                                              \
+                    _found = true;                                                                                     \
+                    *(res_or_tail) = _it;                                                                              \
+                    break;                                                                                             \
+                }                                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+        if (!_found) {                                                                                                 \
+            *(res_or_tail) = _last;                                                                                    \
+        }                                                                                                              \
+        _found;                                                                                                        \
+    })
+
 typedef struct instance_base instance_base_t;
 typedef struct module_base module_base_t;
 

@@ -1,71 +1,74 @@
+/*
+ * Component: Led Strip (WS2812)
+ * 
+*/
+
 #ifndef _WS_LEDSTRIP_H_
 #define _WS_LEDSTRIP_H_
 
+#include <led_strip.h>
 #include "esp_err.h"
-
 #include "eventbus.h"
 
-typedef enum { LED_OFF = 0, LED_ON, LED_BLINK, LED_FADE } led_status_t;
+typedef struct {
+    module_base_t base;
+} ledstrip_module_t;
+
+extern ledstrip_module_t* LEDSTRIP_MODULE;
+
+//=============================================================//
+//============= LED ENTITY ====================================//
 
 typedef enum {
-    LED_CMD_OFF,
-    LED_CMD_SET_RGB,
-    LED_CMD_BLINK,
-    LED_CMD_FADE,
-    /// System, use with caution
-    LED_CMD_CLEAR_ALL,
-    LED_CMD_TIMER_TICK,
-    LED_CMD_MAX,
-} led_cmd_type_t;
+    LED_STATE_OFF,
+    LED_STATE_ON,
+    LED_STATE_BLINK,
+    LED_STATE_FADE,
+    LED_STATE_MAX,
+} led_state_t;
 
 typedef union {
     int _raw_value;
 
-    struct state_opt {
-        uint8_t status;
+    struct status_opt {
+        bool _on;
         uint8_t red;
         uint8_t green;
         uint8_t blue;
     } opt;
-} led_state_t;
+} led_status_t;
+
+typedef union {
+    struct blink {
+        uint16_t on_ms;
+        uint16_t off_ms;
+        uint16_t repeat;
+    } blink;
+
+    struct fade {
+        uint16_t duration;
+    } fade;
+} led_status_opt_t;
+
+typedef struct ws_strip* ws_strip_t;
 
 typedef struct {
-    uint16_t strip_id;
-    uint16_t led_id;
-    led_cmd_type_t type;
-    led_state_t target_state;
+    instance_base_t base;
+    ws_strip_t strip;
+    int tick_counter;
+    led_state_t state;
+    led_status_t status;
+    led_status_opt_t status_opt;
+} ws_led_t;
 
-    union {
-        struct blink {
-            uint16_t on_ms;
-            uint16_t off_ms;
-            uint16_t repeat;
-        } blink;
+ws_strip_t ws_ledstrip_create(int id, int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_out);
 
-        struct fade {
-            uint16_t duration;
-        } fade;
-    } cmd_opt;
-} led_cmd_t;
+ws_led_t* ws_led_create(int id, ws_strip_t stripe, int index_position);
 
-typedef struct {
-    int32_t gpio;
-    size_t leds_amount;
-    bool with_dma;
-    bool invert_out;
-} ws_ledstrip_config_t;
+led_status_t ws_led_get_status(int led_id);
 
-typedef struct {
-    size_t strips_amount;
-    event_handler event_handler;
-} ws_ledstrip_manager_config_t;
+esp_err_t ws_led_set(ws_led_t* led, led_state_t state, led_status_t status, led_status_opt_t* opt);
 
-module_base* ws_ledstrip_manager_create(int id, ws_ledstrip_manager_config_t* config);
-
-esp_err_t ws_ledstrip_add_strip(int strip_id, ws_ledstrip_config_t* config);
-
-esp_err_t ws_ledstrip_send_cmd(led_cmd_t* cmd);
-
-led_state_t ws_ledstrip_get_state(int strip_id, int led_id);
+// esp_err_t ws_ledstrip_send_cmd(led_cmd_t* cmd);
 
 #endif /* _WS_LEDSTRIP_H_ */
