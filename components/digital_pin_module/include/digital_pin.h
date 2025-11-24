@@ -12,11 +12,13 @@
 
 #include "eventbus.h"
 
-typedef struct {
-    module_base_t base;
-} digital_pin_module_t;
+DEVICE_MODULE_DECLARE(DIGITAL_PIN_MODULE);
 
-extern digital_pin_module_t* DIGITAL_PIN_MODULE;
+// typedef struct {
+//     module_base_t base;
+// } digital_pin_module_t;
+
+// extern digital_pin_module_t* DIGITAL_PIN_MODULE;
 
 //=============================================================//
 //============= EVENT DESCRIPTION =============================//
@@ -79,7 +81,7 @@ typedef struct {
 } digital_pin_config_t;
 
 typedef struct {
-    instance_base_t base;
+    component_base_t base;
     bool state;
     digital_pin_config_t config;
     button_handle_t _btn;

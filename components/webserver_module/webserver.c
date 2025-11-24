@@ -14,10 +14,7 @@
 
 #define TAG                             "WEB"
 
-webserver_module_t WEBSERVER_MODULE_obj = {
-    MODULE_INIT(base, WEBSERVER_MODULE),
-};
-webserver_module_t* WEBSERVER_MODULE = &WEBSERVER_MODULE_obj;
+DEVICE_MODULE_REGISTER(WEBSERVER_MODULE);
 
 static char*
 _read_payload_raw(httpd_req_t* req) {
@@ -150,7 +147,7 @@ esp_err_t
 webserver_start_http() {
     esp_err_t err = ESP_FAIL;
     webserver_component_t* webserver =
-        (webserver_component_t*)device_module_get_seldcontained_instance(&WEBSERVER_MODULE->base);
+        (webserver_component_t*)device_module_get_component(WEBSERVER_MODULE, SOLO_COMPONENT_ID);
 
     if (webserver->server == NULL) {
         webserver->https_config.httpd.server_port = 80;
@@ -196,7 +193,7 @@ esp_err_t
 webserver_stop() {
     esp_err_t err = ESP_FAIL;
     webserver_component_t* webserver =
-        (webserver_component_t*)device_module_get_seldcontained_instance(&WEBSERVER_MODULE->base);
+        (webserver_component_t*)device_module_get_component(WEBSERVER_MODULE, SOLO_COMPONENT_ID);
 
     if (webserver->server != NULL) {
         err = httpd_stop(webserver->server);
@@ -231,18 +228,14 @@ webserver_create(webserver_component_config_t* config) {
         return NULL;
     }
 
-    device_instance_constructor(&webserver->base, &WEBSERVER_MODULE->base, SELFCONTAINED_INSTANCE_ID);
-    err = device_module_add_instance(&WEBSERVER_MODULE->base, &webserver->base);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "failed to create instance id=%d for %s err=%d(%s)", SELFCONTAINED_INSTANCE_ID,
-                 WEBSERVER_MODULE->base.name, err, esp_err_to_name(err));
+    if (!device_module_add_component(SOLO_COMPONENT_ID, &webserver->base, WEBSERVER_MODULE)) {
         free(webserver);
         return NULL;
     }
 
     for (webserver_uri_t* uri = webserver->server_config.uris;
          uri < webserver->server_config.uris + webserver->server_config.uris_size; uri++) {
-        device_subscribe(&webserver->base, &webserver->base, uri->event_id, uri->handler); // Subscribe on itself
+        device_module_subscribe_to(&webserver->base, &webserver->base, uri->event_id, uri->handler); // Subscribe on itself
     }
 
     return webserver;

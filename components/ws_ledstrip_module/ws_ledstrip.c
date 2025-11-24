@@ -20,10 +20,7 @@
 
 #define LOCK_MAX_MS                  100
 
-ledstrip_module_t LEDSTRIP_MODULE_obj = {
-    MODULE_INIT(base, LEDSTRIP_MODULE),
-};
-ledstrip_module_t* LEDSTRIP_MODULE = &LEDSTRIP_MODULE_obj;
+DEVICE_MODULE_REGISTER(LEDSTRIP_MODULE);
 
 struct ws_strip {
     int id;
@@ -129,24 +126,24 @@ _tick_led(ws_led_t* led) {
     led->tick_counter++;
 
     if (led->state == LED_STATE_ON) {
-        err = led_strip_set_pixel(led->strip->handle, led->base.instance_id, led->status.opt.red, led->status.opt.green,
+        err = led_strip_set_pixel(led->strip->handle, led->base.id, led->status.opt.red, led->status.opt.green,
                                   led->status.opt.blue);
         led->status.opt._on = true;
         led->strip->need_update = true;
     } else if (led->state == LED_STATE_OFF) {
-        err = led_strip_set_pixel(led->strip->handle, led->base.instance_id, 0, 0, 0);
+        err = led_strip_set_pixel(led->strip->handle, led->base.id, 0, 0, 0);
         led->status.opt._on = false;
         led->strip->need_update = true;
     } else if (led->state == LED_STATE_BLINK) {
         if (led->status.opt._on && led->tick_counter == led->status_opt.blink.on_ms) {
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.instance_id, led->status.opt.red,
-                                      led->status.opt.green, led->status.opt.blue);
+            err = led_strip_set_pixel(led->strip->handle, led->base.id, led->status.opt.red, led->status.opt.green,
+                                      led->status.opt.blue);
             led->status.opt._on = true;
             led->strip->need_update = true;
         } else if (!led->status.opt._on && led->tick_counter == led->status_opt.blink.off_ms) {
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.instance_id, 0, 0, 0);
+            err = led_strip_set_pixel(led->strip->handle, led->base.id, 0, 0, 0);
             led->status.opt._on = false;
             led->strip->need_update = true;
         }
@@ -162,9 +159,9 @@ manager_task(void* arg) {
 
         // grab mutex lock
 
-        instance_list_t* led_list_inst = NULL;
-        SLIST_FOREACH(led_list_inst, LEDSTRIP_MODULE->base.instances, next) {
-            ws_led_t* led = (ws_led_t*)led_list_inst->instance;
+        component_list_t* led_list_inst = NULL;
+        SLIST_FOREACH(led_list_inst, LEDSTRIP_MODULE->components, next) {
+            ws_led_t* led = (ws_led_t*)led_list_inst->component;
             err = _tick_led(led);
         }
 
@@ -310,11 +307,7 @@ ws_led_create(int id, ws_strip_t stripe, int index_position) {
     ws_led_t* led = calloc(1, sizeof(ws_led_t));
     led->strip = stripe;
 
-    device_instance_constructor(&led->base, &LEDSTRIP_MODULE->base, index_position);
-    esp_err_t err = device_module_add_instance(&LEDSTRIP_MODULE->base, &led->base);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "failed to create instance id=%d for %s err=%d(%s)", id, LEDSTRIP_MODULE->base.name, err,
-                 esp_err_to_name(err));
+    if (!device_module_add_component(index_position, &led->base, LEDSTRIP_MODULE)) {
         free(led);
         return NULL;
     }

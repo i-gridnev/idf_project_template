@@ -8,7 +8,7 @@
 #define TAG "PIN"
 
 esp_err_t
-pin_handler(instance_base_t* subscriber, event_t* event) {
+pin_handler(component_base_t* subscriber, event_t* event) {
     esp_err_t err = ESP_OK;
     digital_pin_event_data_t btn_data = (digital_pin_event_data_t)event->data;
     if (event->id == EVT_DIGITAL_PIN_BTN_CLICK) {
@@ -45,7 +45,7 @@ pin_logic() {
         .opt = {.button = {.active_level = 0, .disable_pull = false, .long_press_time = 1000, .short_press_time = 180}},
     };
     digital_pin_t* btn_pin = digital_pin_create(PIN_BTN, &btn_cfg);
-    err = device_subscribe(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_CLICK, pin_handler);
-    err |= device_subscribe(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_LONG_LATCH, pin_handler);
+    err = device_module_subscribe_to(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_CLICK, pin_handler);
+    err |= device_module_subscribe_to(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_LONG_LATCH, pin_handler);
     return err;
 }

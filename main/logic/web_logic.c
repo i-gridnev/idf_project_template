@@ -8,7 +8,7 @@
 #define TAG "UI"
 
 esp_err_t
-on_root(instance_base_t* subscriber, event_t* event) {
+on_root(component_base_t* subscriber, event_t* event) {
     extern const unsigned char index_start[] asm("_binary_index_html_start");
     extern const unsigned char index_end[] asm("_binary_index_html_end");
     webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
@@ -30,7 +30,7 @@ webserver_uri_t URIS[] = {
 };
 
 esp_err_t
-web_activity_handler(instance_base_t* subscriber, event_t* event) {
+web_activity_handler(component_base_t* subscriber, event_t* event) {
     esp_err_t err = ESP_OK;
     if (event->id == EVT_WEBSERVER_INACTIVE) {
         ESP_LOGW(TAG, "EVT_WEBSERVER_INACTIVE");
@@ -44,7 +44,7 @@ web_activity_handler(instance_base_t* subscriber, event_t* event) {
 }
 
 esp_err_t
-wifi_handler(instance_base_t* subscriber, event_t* event) {
+wifi_handler(component_base_t* subscriber, event_t* event) {
     esp_err_t err = ESP_FAIL;
     webserver_component_t* webserver = (webserver_component_t*)subscriber;
     wifi_event_data_t evt_data = (wifi_event_data_t)event->data;
@@ -69,9 +69,9 @@ web_logic() {
         .inactive_shutdown_ms = 0,
     };
     webserver_component_t* webserver = webserver_create(&web_cfg);
-    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_INACTIVE, web_activity_handler);
-    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_ON, web_activity_handler);
-    device_subscribe(&webserver->base, &webserver->base, EVT_WEBSERVER_OFF, web_activity_handler);
+    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_INACTIVE, web_activity_handler);
+    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_ON, web_activity_handler);
+    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_OFF, web_activity_handler);
 
     wifi_component_config_t wifi_cfg = {
         .mode = WIFI_MODE_STA,
@@ -80,5 +80,5 @@ web_logic() {
     };
     wifi_component_t* wifi_net = wifi_network_create(&wifi_cfg);
 
-    return device_subscribe(&webserver->base, &wifi_net->base, EVT_WIFI_STA_CONNECTION, wifi_handler);
+    return device_module_subscribe_to(&webserver->base, &wifi_net->base, EVT_WIFI_STA_CONNECTION, wifi_handler);
 }

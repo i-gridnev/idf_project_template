@@ -10,11 +10,7 @@
 #include "esp_err.h"
 #include "eventbus.h"
 
-typedef struct {
-    module_base_t base;
-} ledstrip_module_t;
-
-extern ledstrip_module_t* LEDSTRIP_MODULE;
+DEVICE_MODULE_DECLARE(LEDSTRIP_MODULE);
 
 //=============================================================//
 //============= LED ENTITY ====================================//
@@ -53,7 +49,7 @@ typedef union {
 typedef struct ws_strip* ws_strip_t;
 
 typedef struct {
-    instance_base_t base;
+    component_base_t base;
     ws_strip_t strip;
     int tick_counter;
     led_state_t state;

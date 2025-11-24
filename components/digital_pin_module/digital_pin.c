@@ -7,10 +7,7 @@
 
 #define TAG "DPIN"
 
-digital_pin_module_t DIGITAL_PIN_MODULE_obj = {
-    MODULE_INIT(base, DIGITAL_PIN_MODULE),
-};
-digital_pin_module_t* DIGITAL_PIN_MODULE = &DIGITAL_PIN_MODULE_obj;
+DEVICE_MODULE_REGISTER(DIGITAL_PIN_MODULE);
 
 static void
 _input_event_cb(void* arg, void* data) {
@@ -178,11 +175,7 @@ digital_pin_create(int id, digital_pin_config_t* config) {
     digital_pin_t* pin = calloc(1, sizeof(digital_pin_t));
     memcpy(&pin->config, config, sizeof(digital_pin_config_t));
 
-    device_instance_constructor(&pin->base, &DIGITAL_PIN_MODULE->base, id);
-    esp_err_t err = device_module_add_instance(&DIGITAL_PIN_MODULE->base, &pin->base);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "failed to create instance id=%d for %s err=%d(%s)", id, DIGITAL_PIN_MODULE->base.name, err,
-                 esp_err_to_name(err));
+    if (!device_module_add_component(id, &pin->base, DIGITAL_PIN_MODULE)) {
         free(pin);
         return NULL;
     }

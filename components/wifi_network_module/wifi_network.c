@@ -14,10 +14,7 @@
 #define STATUS_STA_DISCONNECTED       BIT2
 #define STATUS_STA_TRYING             BIT3
 
-wifi_module_t WIFI_MODULE_obj = {
-    MODULE_INIT(base, WIFI_MODULE),
-};
-wifi_module_t* WIFI_MODULE = &WIFI_MODULE_obj;
+DEVICE_MODULE_REGISTER(WIFI_MODULE);
 
 static void
 _report(wifi_component_t* self, int id, bool success) {
@@ -34,7 +31,7 @@ _report(wifi_component_t* self, int id, bool success) {
 
 static EventBits_t
 _await_status(EventBits_t stat_bits, TickType_t ticks_timeout) {
-    wifi_component_t* self = (wifi_component_t*)device_module_get_seldcontained_instance(&WIFI_MODULE->base);
+    wifi_component_t* self = (wifi_component_t*)device_module_get_component(WIFI_MODULE, SOLO_COMPONENT_ID);
     return xEventGroupWaitBits(self->status, stat_bits, false, false, ticks_timeout);
 }
 
@@ -115,7 +112,7 @@ _system_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* 
 
 esp_err_t
 wifi_network_STA_connect(char* STA_ssid, char* STA_pass) {
-    wifi_component_t* self = (wifi_component_t*)device_module_get_seldcontained_instance(&WIFI_MODULE->base);
+    wifi_component_t* self = (wifi_component_t*)device_module_get_component(WIFI_MODULE, SOLO_COMPONENT_ID);
     wifi_network_STA_disconnect();
     esp_wifi_set_mode(WIFI_MODE_STA);
     wifi_config_t wifi_sta_config = {0};
@@ -141,20 +138,20 @@ wifi_network_STA_connect(char* STA_ssid, char* STA_pass) {
 
 esp_err_t
 wifi_network_STA_disconnect() {
-    wifi_component_t* self = (wifi_component_t*)device_module_get_seldcontained_instance(&WIFI_MODULE->base);
+    wifi_component_t* self = (wifi_component_t*)device_module_get_component(WIFI_MODULE, SOLO_COMPONENT_ID);
     xEventGroupClearBits(self->status, STATUS_STA_CONNECTION_ALLOWED);
     return esp_wifi_disconnect();
 }
 
 bool
 is_wifi_network_STA_connected() {
-    wifi_component_t* self = (wifi_component_t*)device_module_get_seldcontained_instance(&WIFI_MODULE->base);
+    wifi_component_t* self = (wifi_component_t*)device_module_get_component(WIFI_MODULE, SOLO_COMPONENT_ID);
     return _get_status(self, STATUS_STA_CONNECTED);
 }
 
 bool
 is_wifi_network_STA_trying() {
-    wifi_component_t* self = (wifi_component_t*)device_module_get_seldcontained_instance(&WIFI_MODULE->base);
+    wifi_component_t* self = (wifi_component_t*)device_module_get_component(WIFI_MODULE, SOLO_COMPONENT_ID);
     return _get_status(self, STATUS_STA_TRYING);
 }
 
@@ -177,11 +174,7 @@ wifi_network_create(wifi_component_config_t* config) {
     const esp_timer_create_args_t timer_args = {.callback = &_reconnect_timer_callback, .arg = self};
     esp_timer_create(&timer_args, &self->reconnect_timer);
 
-    device_instance_constructor(&self->base, &WIFI_MODULE->base, SELFCONTAINED_INSTANCE_ID);
-    esp_err_t err = device_module_add_instance(&WIFI_MODULE->base, &self->base);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "failed to create instance id=%d for %s err=%d(%s)", SELFCONTAINED_INSTANCE_ID,
-                 WIFI_MODULE->base.name, err, esp_err_to_name(err));
+    if (!device_module_add_component(SOLO_COMPONENT_ID, &self->base, WIFI_MODULE)) {
         free(self);
         return NULL;
     }

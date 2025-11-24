@@ -11,11 +11,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-typedef struct {
-    module_base_t base;
-} webserver_module_t;
-
-extern webserver_module_t* WEBSERVER_MODULE;
+DEVICE_MODULE_DECLARE(WEBSERVER_MODULE);
 
 //=============================================================//
 //============= EVENT DESCRIPTION =============================//
@@ -56,7 +52,7 @@ typedef struct {
 } webserver_component_config_t;
 
 typedef struct {
-    instance_base_t base;
+    component_base_t base;
     // char* hostname;
     httpd_handle_t server;
     webserver_component_config_t server_config;

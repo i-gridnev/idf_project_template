@@ -13,11 +13,7 @@
 
 #include "eventbus.h"
 
-typedef struct {
-    module_base_t base;
-} wifi_module_t;
-
-extern wifi_module_t* WIFI_MODULE;
+DEVICE_MODULE_DECLARE(WIFI_MODULE);
 
 //=============================================================//
 //============= EVENT DESCRIPTION =============================//
@@ -43,7 +39,7 @@ typedef struct {
 } wifi_component_config_t;
 
 typedef struct {
-    instance_base_t base;
+    component_base_t base;
     wifi_component_config_t config;
     EventGroupHandle_t status;
     int connect_attempts;

@@ -14,7 +14,20 @@
 
 #include <config_entry.h>
 
-// Return pointer to tail item or NULL if list is empty
+#define SOLO_COMPONENT_ID 0
+
+typedef struct component_base component_base_t;
+typedef struct module_base module_base_t;
+
+// Declare a mudule with the name, should be placed in .h per every module
+#define DEVICE_MODULE_DECLARE(id) extern module_base_t* id
+
+// Bootstrap the mudule by name in .c, requires DEVICE_MODULE_DECLARE(name) beforehand in .h
+#define DEVICE_MODULE_REGISTER(id)                                                                                     \
+    module_base_t id##_obj = {.name = #id, .middlewares = NULL, .components = NULL};                                   \
+    module_base_t* id = &id##_obj
+
+// SLIST find tail macro. Return pointer to tail item or NULL if list is empty
 #define SLIST_TAIL(head, field)                                                                                        \
     ({                                                                                                                 \
         __typeof__(SLIST_FIRST(head)) _it, _last = NULL;                                                               \
@@ -24,6 +37,8 @@
         _last;                                                                                                         \
     })
 
+// SLIST find macro with filter callback.
+// Footprint for callback: bool fcn(component_type* item, void* ctx), where component_type should be of list item type
 // Return true if filter got triggered and with a pointer to the item in *res_or_tail*
 // Return false if filter not triggered and *res_or_tail* NULL for case list is empty or a pointer to a tail item
 #define SLIST_GET_WITH_TAIL(head, field, res_or_tail, callback, ctx)                                                   \
@@ -46,43 +61,41 @@
         _found;                                                                                                        \
     })
 
-typedef struct instance_base instance_base_t;
-typedef struct module_base module_base_t;
+//===========================================================================//
+//====================== EVENT AND SUBSCRIPTION =============================//
+//===========================================================================//
 
 typedef struct {
-    instance_base_t* issuer;
+    component_base_t* issuer;
     int id;
     void* data;
     size_t data_size;
     void (*data_free_fcn)(void* data);
 } event_t;
 
-typedef esp_err_t (*event_handler)(instance_base_t* subscriber, event_t* event);
-
-typedef esp_err_t (*middleware_handler)(event_t* event);
+typedef esp_err_t (*event_handler)(component_base_t* subscriber, event_t* event);
 
 typedef struct subscription {
-    instance_base_t* subscriber;
+    component_base_t* subscriber;
     event_handler handler;
     SLIST_ENTRY(subscription) next;
 } subscription_t;
 
 SLIST_HEAD(subscription_head, subscription);
 
-typedef struct subscription_list {
+typedef struct event_subs {
     int event_id;
     struct subscription_head* subs;
-    SLIST_ENTRY(subscription_list) next;
-} subscription_list_t;
+    SLIST_ENTRY(event_subs) next;
+} event_subs;
 
-SLIST_HEAD(subscription_list_head, subscription_list);
+SLIST_HEAD(event_subs_head, event_subs);
 
-typedef struct instance_list {
-    instance_base_t* instance;
-    SLIST_ENTRY(instance_list) next;
-} instance_list_t;
+//===========================================================================//
+//========================== MIDDLEWARE =====================================//
+//===========================================================================//
 
-SLIST_HEAD(instance_list_head, instance_list);
+typedef esp_err_t (*middleware_handler)(event_t* event);
 
 typedef struct middleware_list {
     middleware_handler handler;
@@ -91,34 +104,46 @@ typedef struct middleware_list {
 
 SLIST_HEAD(middleware_list_head, middleware_list);
 
-struct instance_base {
+//===========================================================================//
+//========================== COMPONENT ======================================//
+//===========================================================================//
+
+struct component_base {
     module_base_t* module_ptr;
-    int instance_id;
-    struct subscription_list_head* subscriptions;
+    int id;
+    struct event_subs_head* event_subs;
 };
+
+typedef struct component_list {
+    component_base_t* component;
+    SLIST_ENTRY(component_list) next;
+} component_list_t;
+
+SLIST_HEAD(component_list_head, component_list);
+
+//===========================================================================//
+//========================== MODULE =========================================//
+//===========================================================================//
 
 struct module_base {
     char* name;
     struct middleware_list_head* middlewares;
-    struct instance_list_head* instances;
+    struct component_list_head* components;
 };
 
-#define SELFCONTAINED_INSTANCE_ID     0
-#define MODULE_INIT(base, namestring) .base = {.name = #namestring, .middlewares = NULL, .instances = NULL}
+//===========================================================================//
 
 esp_err_t device_init();
 
 esp_err_t device_module_add_middleware(module_base_t* module, middleware_handler handler);
 
-esp_err_t device_module_add_instance(module_base_t* module, instance_base_t* instance);
+esp_err_t device_module_add_component(int id, component_base_t* component, module_base_t* module);
 
-instance_base_t* device_module_get_instance(module_base_t* module, int id);
+component_base_t* device_module_get_component(module_base_t* module, int id);
 
-instance_base_t* device_module_get_seldcontained_instance(module_base_t* module);
+esp_err_t device_module_subscribe(component_base_t* self, module_base_t* module, int id, event_handler h);
 
-void device_instance_constructor(instance_base_t* base, module_base_t* module, int id);
-
-esp_err_t device_subscribe(instance_base_t* self, instance_base_t* t, int id, event_handler h);
+esp_err_t device_module_subscribe_to(component_base_t* self, component_base_t* t, int id, event_handler h);
 
 esp_err_t device_post_event(event_t* event);
 
