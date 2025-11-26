@@ -7,7 +7,6 @@
 
 #include <device_config.h>
 #include <eventbus.h>
-#include <logic.h>
 
 /* ==== heap memory watch (testing) ==== */
 // #include "esp_heap_trace.h"

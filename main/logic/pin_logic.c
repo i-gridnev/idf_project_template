@@ -1,9 +1,7 @@
-#include <device_config.h>
 #include <esp_log.h>
-#include <eventbus.h>
-#include <wifi_network.h>
 
-#include <logic.h>
+#include <device_config.h>
+#include <eventbus.h>
 
 #define TAG "PIN"
 
@@ -45,7 +43,7 @@ pin_logic() {
         .opt = {.button = {.active_level = 0, .disable_pull = false, .long_press_time = 1000, .short_press_time = 180}},
     };
     digital_pin_t* btn_pin = digital_pin_create(PIN_BTN, &btn_cfg);
-    err = device_module_subscribe_to(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_CLICK, pin_handler);
-    err |= device_module_subscribe_to(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_LONG_LATCH, pin_handler);
+    err = device_subscribe(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_CLICK, pin_handler);
+    err |= device_subscribe(&btn_pin->base, &btn_pin->base, EVT_DIGITAL_PIN_BTN_LONG_LATCH, pin_handler);
     return err;
 }

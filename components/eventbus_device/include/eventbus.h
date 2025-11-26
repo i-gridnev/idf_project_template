@@ -9,57 +9,13 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include <sys/queue.h>
 #include "esp_err.h"
 
 #include <config_entry.h>
-
-#define SOLO_COMPONENT_ID 0
+#include <slist_patch.h>
 
 typedef struct component_base component_base_t;
 typedef struct module_base module_base_t;
-
-// Declare a mudule with the name, should be placed in .h per every module
-#define DEVICE_MODULE_DECLARE(id) extern module_base_t* id
-
-// Bootstrap the mudule by name in .c, requires DEVICE_MODULE_DECLARE(name) beforehand in .h
-#define DEVICE_MODULE_REGISTER(id)                                                                                     \
-    module_base_t id##_obj = {.name = #id, .middlewares = NULL, .components = NULL};                                   \
-    module_base_t* id = &id##_obj
-
-// SLIST find tail macro. Return pointer to tail item or NULL if list is empty
-#define SLIST_TAIL(head, field)                                                                                        \
-    ({                                                                                                                 \
-        __typeof__(SLIST_FIRST(head)) _it, _last = NULL;                                                               \
-        if (!SLIST_EMPTY(head)) {                                                                                      \
-            SLIST_FOREACH(_it, head, field) { _last = _it; }                                                           \
-        }                                                                                                              \
-        _last;                                                                                                         \
-    })
-
-// SLIST find macro with filter callback.
-// Footprint for callback: bool fcn(component_type* item, void* ctx), where component_type should be of list item type
-// Return true if filter got triggered and with a pointer to the item in *res_or_tail*
-// Return false if filter not triggered and *res_or_tail* NULL for case list is empty or a pointer to a tail item
-#define SLIST_GET_WITH_TAIL(head, field, res_or_tail, callback, ctx)                                                   \
-    ({                                                                                                                 \
-        __typeof__(SLIST_FIRST(head)) _it, _last = NULL;                                                               \
-        bool _found = false;                                                                                           \
-        if (!SLIST_EMPTY(head)) {                                                                                      \
-            SLIST_FOREACH(_it, head, field) {                                                                          \
-                _last = _it;                                                                                           \
-                if (callback(_it, ctx)) {                                                                              \
-                    _found = true;                                                                                     \
-                    *(res_or_tail) = _it;                                                                              \
-                    break;                                                                                             \
-                }                                                                                                      \
-            }                                                                                                          \
-        }                                                                                                              \
-        if (!_found) {                                                                                                 \
-            *(res_or_tail) = _last;                                                                                    \
-        }                                                                                                              \
-        _found;                                                                                                        \
-    })
 
 //===========================================================================//
 //====================== EVENT AND SUBSCRIPTION =============================//
@@ -92,21 +48,10 @@ typedef struct event_subs {
 SLIST_HEAD(event_subs_head, event_subs);
 
 //===========================================================================//
-//========================== MIDDLEWARE =====================================//
-//===========================================================================//
-
-typedef esp_err_t (*middleware_handler)(event_t* event);
-
-typedef struct middleware_list {
-    middleware_handler handler;
-    SLIST_ENTRY(middleware_list) next;
-} middleware_list_t;
-
-SLIST_HEAD(middleware_list_head, middleware_list);
-
-//===========================================================================//
 //========================== COMPONENT ======================================//
 //===========================================================================//
+
+#define SOLO_COMPONENT_ID -1
 
 struct component_base {
     module_base_t* module_ptr;
@@ -127,23 +72,29 @@ SLIST_HEAD(component_list_head, component_list);
 
 struct module_base {
     char* name;
-    struct middleware_list_head* middlewares;
+    struct subscription_head* middlewares;
     struct component_list_head* components;
 };
+
+// Declare a mudule with the name, should be placed in .h per every module
+#define DEVICE_MODULE_DECLARE(id) extern module_base_t* id
+
+// Bootstrap the mudule by name in .c, requires DEVICE_MODULE_DECLARE(name) beforehand in .h
+#define DEVICE_MODULE_REGISTER(id)                                                                                     \
+    module_base_t id##_obj = {.name = #id, .middlewares = NULL, .components = NULL};                                   \
+    module_base_t* id = &id##_obj
 
 //===========================================================================//
 
 esp_err_t device_init();
 
-esp_err_t device_module_add_middleware(module_base_t* module, middleware_handler handler);
+esp_err_t device_module_add_middleware(component_base_t* subscriber, module_base_t* module, event_handler h);
 
 esp_err_t device_module_add_component(int id, component_base_t* component, module_base_t* module);
 
 component_base_t* device_module_get_component(module_base_t* module, int id);
 
-esp_err_t device_module_subscribe(component_base_t* self, module_base_t* module, int id, event_handler h);
-
-esp_err_t device_module_subscribe_to(component_base_t* self, component_base_t* t, int id, event_handler h);
+esp_err_t device_subscribe(component_base_t* subscriber, component_base_t* t, int id, event_handler h);
 
 esp_err_t device_post_event(event_t* event);
 

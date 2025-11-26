@@ -1,9 +1,7 @@
-#include <device_config.h>
 #include <esp_log.h>
-#include <eventbus.h>
-#include <wifi_network.h>
 
-#include <logic.h>
+#include <device_config.h>
+#include <eventbus.h>
 
 #define TAG "UI"
 
@@ -44,17 +42,19 @@ web_activity_handler(component_base_t* subscriber, event_t* event) {
 }
 
 esp_err_t
-wifi_handler(component_base_t* subscriber, event_t* event) {
-    esp_err_t err = ESP_FAIL;
+wifi_middelware(component_base_t* subscriber, event_t* event) {
+    esp_err_t err = ESP_OK;
     webserver_component_t* webserver = (webserver_component_t*)subscriber;
     wifi_event_data_t evt_data = (wifi_event_data_t)event->data;
 
-    if (evt_data.success) {
-        if (!webserver->is_started) {
-            err = webserver_start_http();
+    if (event->id == EVT_WIFI_STA_CONNECTION) {
+        if (evt_data.success) {
+            if (!webserver->is_started) {
+                err = webserver_start_http();
+            }
+        } else {
+            ESP_LOGW(TAG, "Wifi off, web is still alive");
         }
-    } else {
-        ESP_LOGW(TAG, "Wifi off, web is still alive");
     }
     return err;
 }
@@ -69,16 +69,14 @@ web_logic() {
         .inactive_shutdown_ms = 0,
     };
     webserver_component_t* webserver = webserver_create(&web_cfg);
-    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_INACTIVE, web_activity_handler);
-    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_ON, web_activity_handler);
-    device_module_subscribe_to(&webserver->base, &webserver->base, EVT_WEBSERVER_OFF, web_activity_handler);
+    device_module_add_middleware(&webserver->base, WEBSERVER_MODULE, web_activity_handler);
 
     wifi_component_config_t wifi_cfg = {
         .mode = WIFI_MODE_STA,
         .reconnect_attempts = 3,
         .reconnect_interval_ms = 7000,
     };
-    wifi_component_t* wifi_net = wifi_network_create(&wifi_cfg);
+    wifi_network_create(&wifi_cfg);
 
-    return device_module_subscribe_to(&webserver->base, &wifi_net->base, EVT_WIFI_STA_CONNECTION, wifi_handler);
+    return device_module_add_middleware(&webserver->base, WIFI_MODULE, wifi_middelware);
 }

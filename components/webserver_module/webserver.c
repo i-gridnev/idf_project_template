@@ -235,7 +235,7 @@ webserver_create(webserver_component_config_t* config) {
 
     for (webserver_uri_t* uri = webserver->server_config.uris;
          uri < webserver->server_config.uris + webserver->server_config.uris_size; uri++) {
-        device_module_subscribe_to(&webserver->base, &webserver->base, uri->event_id, uri->handler); // Subscribe on itself
+        device_subscribe(&webserver->base, &webserver->base, uri->event_id, uri->handler); // Subscribe on itself
     }
 
     return webserver;

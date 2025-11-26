@@ -14,12 +14,6 @@
 
 DEVICE_MODULE_DECLARE(DIGITAL_PIN_MODULE);
 
-// typedef struct {
-//     module_base_t base;
-// } digital_pin_module_t;
-
-// extern digital_pin_module_t* DIGITAL_PIN_MODULE;
-
 //=============================================================//
 //============= EVENT DESCRIPTION =============================//
 enum {

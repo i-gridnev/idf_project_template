@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+#include "eventbus.h"
+
 DEVICE_MODULE_DECLARE(WEBSERVER_MODULE);
 
 //=============================================================//
