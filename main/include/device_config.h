@@ -18,6 +18,7 @@ enum config_entry_ids {
 
 enum {
     EVT_WEBSERVER_UI_ON_ROOT = EVT_WEBSERVER_USER_URI,
+    EVT_WEBSERVER_UI_ON_TEST,
 };
 
 esp_err_t web_logic();

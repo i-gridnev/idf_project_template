@@ -1,3 +1,4 @@
+#include <cJSON.h>
 #include <esp_log.h>
 
 #include <device_config.h>
@@ -18,12 +19,38 @@ on_root(component_base_t* subscriber, event_t* event) {
     return webserver_enqueue_response(&response);
 }
 
+char* msg_success = "{\"ret\":\"success\"}";
+
+esp_err_t
+on_test(component_base_t* subscriber, event_t* event) {
+    webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
+
+    cJSON* input = cJSON_Parse(request->buffer.ptr);
+    char* pret_print = cJSON_Print(input);
+    ESP_LOGI(TAG, "%s", pret_print);
+    free(pret_print);
+    cJSON_Delete(input);
+
+    webserver_req_buffer_t response = {
+        .req = request->req,
+        .buffer = {.ptr = msg_success, .size = strlen(msg_success), .persistent = true},
+    };
+    httpd_resp_set_type(response.req, HTTPD_TYPE_TEXT);
+    return webserver_enqueue_response(&response);
+}
+
 webserver_uri_t URIS[] = {
     {
         .uri = "/",
         .method = HTTP_GET,
         .event_id = EVT_WEBSERVER_UI_ON_ROOT,
         .handler = on_root,
+    },
+    {
+        .uri = "/test",
+        .method = HTTP_POST,
+        .event_id = EVT_WEBSERVER_UI_ON_TEST,
+        .handler = on_test,
     },
 };
 
