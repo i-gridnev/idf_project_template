@@ -41,7 +41,7 @@ SLIST_HEAD(subscription_head, subscription);
 
 typedef struct event_subs {
     int event_id;
-    struct subscription_head* subs;
+    struct subscription_head subs;
     SLIST_ENTRY(event_subs) next;
 } event_subs;
 
@@ -56,7 +56,7 @@ SLIST_HEAD(event_subs_head, event_subs);
 struct component_base {
     module_base_t* module_ptr;
     int id;
-    struct event_subs_head* event_subs;
+    struct event_subs_head event_subs;
 };
 
 typedef struct component_list {
@@ -72,8 +72,8 @@ SLIST_HEAD(component_list_head, component_list);
 
 struct module_base {
     char* name;
-    struct subscription_head* middlewares;
-    struct component_list_head* components;
+    struct subscription_head middlewares;
+    struct component_list_head components;
 };
 
 // Declare a mudule with the name, should be placed in .h per every module
@@ -81,7 +81,7 @@ struct module_base {
 
 // Bootstrap the mudule by name in .c, requires DEVICE_MODULE_DECLARE(name) beforehand in .h
 #define DEVICE_MODULE_REGISTER(id)                                                                                     \
-    module_base_t id##_obj = {.name = #id, .middlewares = NULL, .components = NULL};                                   \
+    static module_base_t id##_obj = {.name = #id, .middlewares.slh_first = NULL, .components.slh_first = NULL};        \
     module_base_t* id = &id##_obj
 
 //===========================================================================//

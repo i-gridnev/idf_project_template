@@ -16,6 +16,7 @@ DEVICE_MODULE_DECLARE(LEDSTRIP_MODULE);
 //============= LED ENTITY ====================================//
 
 typedef enum {
+    LED_STATE_DISABLED = -1,
     LED_STATE_OFF,
     LED_STATE_ON,
     LED_STATE_BLINK,

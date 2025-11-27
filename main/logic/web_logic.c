@@ -25,11 +25,15 @@ esp_err_t
 on_test(component_base_t* subscriber, event_t* event) {
     webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
 
+    ESP_LOGI(TAG, "%s", request->buffer.ptr);
+
     cJSON* input = cJSON_Parse(request->buffer.ptr);
-    char* pret_print = cJSON_Print(input);
-    ESP_LOGI(TAG, "%s", pret_print);
-    free(pret_print);
+    int index = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "index"));
+    int on_off = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "on_off"));
     cJSON_Delete(input);
+
+    led_status_e status = on_off ? LED_STATE_ON : LED_STATE_OFF;
+    ws_led_set(index, status, 250, 0, 0, NULL);
 
     webserver_req_buffer_t response = {
         .req = request->req,

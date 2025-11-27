@@ -175,7 +175,7 @@ digital_pin_create(int id, digital_pin_config_t* config) {
     digital_pin_t* pin = calloc(1, sizeof(digital_pin_t));
     memcpy(&pin->config, config, sizeof(digital_pin_config_t));
 
-    if (!device_module_add_component(id, &pin->base, DIGITAL_PIN_MODULE)) {
+    if (device_module_add_component(id, &pin->base, DIGITAL_PIN_MODULE) != ESP_OK) {
         free(pin);
         return NULL;
     }

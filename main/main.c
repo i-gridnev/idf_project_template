@@ -44,7 +44,7 @@ app_main(void) {
 
     ESP_ERROR_CHECK(web_logic());
     ESP_ERROR_CHECK(pin_logic());
-    // ESP_ERROR_CHECK(led_logic());
+    ESP_ERROR_CHECK(led_logic());
 
     /*==============================================*/
 

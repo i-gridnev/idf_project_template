@@ -24,7 +24,7 @@ static eventbus_t EVENTBUS;
 
 bool
 filter_component_id_exist(component_list_t* item, void* ctx) {
-    int id = (int)ctx;
+    int id = *(int*)ctx;
     return item->component->id == id;
 }
 
@@ -36,7 +36,7 @@ filter_subscription_exist(subscription_t* item, void* ctx) {
 
 bool
 filter_event_subs_exist(event_subs* item, void* ctx) {
-    int id = (int)ctx;
+    int id = *(int*)ctx;
     return item->event_id == id;
 }
 
@@ -48,7 +48,7 @@ eventbus_task(void* params) {
     while (true) {
         if (xQueueReceive(EVENTBUS.event_queue, &event, 1)) {
             subscription_t* middleware;
-            SLIST_FOREACH(middleware, event.issuer->module_ptr->middlewares, next) {
+            SLIST_FOREACH(middleware, &event.issuer->module_ptr->middlewares, next) {
                 err = middleware->handler(middleware->subscriber, &event);
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "event id=%d issuer %s (id=%d) middleware err=%d(%s)", event.id,
@@ -58,10 +58,10 @@ eventbus_task(void* params) {
 
             bool subscriptions_found = false;
             event_subs* sub_list;
-            SLIST_FOREACH(sub_list, event.issuer->event_subs, next) {
+            SLIST_FOREACH(sub_list, &event.issuer->event_subs, next) {
                 if (sub_list->event_id == event.id) {
                     subscription_t* sub;
-                    SLIST_FOREACH(sub, sub_list->subs, next) {
+                    SLIST_FOREACH(sub, &sub_list->subs, next) {
                         subscriptions_found = true;
                         err = sub->handler(sub->subscriber, &event);
                         if (err != ESP_OK) {
@@ -73,8 +73,8 @@ eventbus_task(void* params) {
                 }
             }
             if (!subscriptions_found) {
-                ESP_LOGW(TAG, "event id=%d issuer %s (id=%d) no subscribers", event.id, event.issuer->module_ptr->name,
-                         event.issuer->id);
+                ESP_LOGW(TAG, "event id=%d from issuer id=%d (%s) no subscribers", event.id, event.issuer->id,
+                         event.issuer->module_ptr->name);
             }
             if (event.data_free_fcn) {
                 event.data_free_fcn(event.data);
@@ -87,24 +87,17 @@ eventbus_task(void* params) {
 //================================= Public ======================================//
 //===============================================================================//
 
-void
-device_instance_constructor(component_base_t* base, module_base_t* module, int id) {
-    base->module_ptr = module;
-    base->id = id;
-    SLIST_INIT(base->event_subs);
-}
-
 component_base_t*
 device_module_get_component(module_base_t* module, int id) {
     component_base_t* base = NULL;
     component_list_t* component_list = NULL;
     if (id == SOLO_COMPONENT_ID) {
-        if (!SLIST_EMPTY(module->components)) {
-            component_list = SLIST_FIRST(module->components);
+        if (!SLIST_EMPTY(&module->components)) {
+            component_list = SLIST_FIRST(&module->components);
             base = component_list->component;
         }
     } else {
-        if (SLIST_GET_WITH_TAIL(module->components, next, &component_list, filter_component_id_exist, (void*)id)) {
+        if (SLIST_GET_WITH_TAIL(&module->components, next, &component_list, filter_component_id_exist, &id)) {
             base = component_list->component;
         }
     }
@@ -116,7 +109,7 @@ device_module_add_middleware(component_base_t* subscriber, module_base_t* module
     esp_err_t err = ESP_OK;
 
     subscription_t* tail = NULL;
-    if (SLIST_GET_WITH_TAIL(module->middlewares, next, &tail, filter_subscription_exist, h)) {
+    if (SLIST_GET_WITH_TAIL(&module->middlewares, next, &tail, filter_subscription_exist, h)) {
         err = ESP_ERR_INVALID_ARG;
         ESP_LOGE(TAG, "middleware already registered");
     } else {
@@ -126,7 +119,7 @@ device_module_add_middleware(component_base_t* subscriber, module_base_t* module
         if (tail) {
             SLIST_INSERT_AFTER(tail, new_middleware, next);
         } else {
-            SLIST_INSERT_HEAD(module->middlewares, new_middleware, next);
+            SLIST_INSERT_HEAD(&module->middlewares, new_middleware, next);
         }
     }
     return err;
@@ -140,9 +133,8 @@ device_module_add_component(int id, component_base_t* component, module_base_t* 
     // Init component base
     component->module_ptr = module;
     component->id = id;
-    SLIST_INIT(component->event_subs);
-
-    if (SLIST_GET_WITH_TAIL(module->components, next, &tail, filter_component_id_exist, (void*)component->id)) {
+    SLIST_INIT(&component->event_subs);
+    if (SLIST_GET_WITH_TAIL(&module->components, next, &tail, filter_component_id_exist, &component->id)) {
         err = ESP_ERR_NOT_ALLOWED;
     } else {
         component_list_t* new_item = calloc(1, sizeof(component_list_t));
@@ -150,7 +142,7 @@ device_module_add_component(int id, component_base_t* component, module_base_t* 
         if (tail) {
             SLIST_INSERT_AFTER(tail, new_item, next);
         } else {
-            SLIST_INSERT_HEAD(module->components, new_item, next);
+            SLIST_INSERT_HEAD(&module->components, new_item, next);
         }
     }
     if (err != ESP_OK) {
@@ -164,13 +156,14 @@ device_subscribe(component_base_t* self, component_base_t* t, int id, event_hand
     esp_err_t err = ESP_OK;
 
     event_subs* sub_list = NULL;
-    if (!SLIST_GET_WITH_TAIL(t->event_subs, next, &sub_list, filter_event_subs_exist, (void*)id)) {
+    if (!SLIST_GET_WITH_TAIL(&t->event_subs, next, &sub_list, filter_event_subs_exist, &id)) {
         event_subs* new_sub_list = calloc(1, sizeof(event_subs));
         new_sub_list->event_id = id;
+        SLIST_INIT(&new_sub_list->subs);
         if (sub_list) {
             SLIST_INSERT_AFTER(sub_list, new_sub_list, next);
         } else {
-            SLIST_INSERT_HEAD(t->event_subs, new_sub_list, next);
+            SLIST_INSERT_HEAD(&t->event_subs, new_sub_list, next);
         }
         sub_list = new_sub_list;
     }
@@ -179,11 +172,11 @@ device_subscribe(component_base_t* self, component_base_t* t, int id, event_hand
     new_sub->subscriber = self;
     new_sub->handler = h;
 
-    subscription_t* sub_tail = SLIST_TAIL(sub_list->subs, next);
+    subscription_t* sub_tail = SLIST_TAIL(&sub_list->subs, next);
     if (sub_tail) {
         SLIST_INSERT_AFTER(sub_tail, new_sub, next);
     } else {
-        SLIST_INSERT_HEAD(sub_list->subs, new_sub, next);
+        SLIST_INSERT_HEAD(&sub_list->subs, new_sub, next);
     }
 
     return err;

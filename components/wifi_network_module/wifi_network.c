@@ -174,7 +174,7 @@ wifi_network_create(wifi_component_config_t* config) {
     const esp_timer_create_args_t timer_args = {.callback = &_reconnect_timer_callback, .arg = self};
     esp_timer_create(&timer_args, &self->reconnect_timer);
 
-    if (!device_module_add_component(SOLO_COMPONENT_ID, &self->base, WIFI_MODULE)) {
+    if (device_module_add_component(SOLO_COMPONENT_ID, &self->base, WIFI_MODULE)!= ESP_OK) {
         free(self);
         return NULL;
     }

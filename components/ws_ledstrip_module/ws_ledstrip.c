@@ -28,7 +28,7 @@ struct ws_strip {
 SLIST_HEAD(ws_strip_head, ws_strip);
 
 typedef struct {
-    struct ws_strip_head* stripes;
+    struct ws_strip_head stripes;
     TaskHandle_t task;
     SemaphoreHandle_t lock;
 } _module_aux_t;
@@ -92,7 +92,7 @@ _tick_led(ws_led_t* led) {
 static void
 manager_task(void* arg) {
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(LED_MANAGER_TICK_MS * 1000));
+        vTaskDelay(pdMS_TO_TICKS(LED_MANAGER_TICK_MS));
 
         if (xSemaphoreTake(LEDSTRIP_MODULE_AUX.lock, pdMS_TO_TICKS(LED_MANAGER_LOCK_MAX_MS)) != pdTRUE) {
             ESP_LOGE(TAG, "task failed with lock");
@@ -100,13 +100,13 @@ manager_task(void* arg) {
         }
 
         component_list_t* led_list_item = NULL;
-        SLIST_FOREACH(led_list_item, LEDSTRIP_MODULE->components, next) {
+        SLIST_FOREACH(led_list_item, &LEDSTRIP_MODULE->components, next) {
             ws_led_t* led = (ws_led_t*)led_list_item->component;
             _tick_led(led);
         }
 
         struct ws_strip* strip = NULL;
-        SLIST_FOREACH(strip, LEDSTRIP_MODULE_AUX.stripes, next) {
+        SLIST_FOREACH(strip, &LEDSTRIP_MODULE_AUX.stripes, next) {
             if (strip->need_update) {
                 esp_err_t err = led_strip_refresh(strip->handle);
                 if (err != ESP_OK) {
@@ -185,7 +185,7 @@ ws_ledstrip_create(int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_o
     }
 
     struct ws_strip* stripe = NULL;
-    if (SLIST_GET_WITH_TAIL(LEDSTRIP_MODULE_AUX.stripes, next, &stripe, filter_stripe_exist, (void*)gpio)) {
+    if (SLIST_GET_WITH_TAIL(&LEDSTRIP_MODULE_AUX.stripes, next, &stripe, filter_stripe_exist, (void*)gpio)) {
         ESP_LOGE(TAG, "stripe on gpio=%d already registered", (int)gpio);
         return NULL;
     }
@@ -194,7 +194,7 @@ ws_ledstrip_create(int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_o
     if (stripe) {
         SLIST_INSERT_AFTER(stripe, new_stripe, next);
     } else {
-        SLIST_INSERT_HEAD(LEDSTRIP_MODULE_AUX.stripes, new_stripe, next);
+        SLIST_INSERT_HEAD(&LEDSTRIP_MODULE_AUX.stripes, new_stripe, next);
     }
     stripe = new_stripe;
 
@@ -225,8 +225,10 @@ ws_led_create(int id, ws_strip_t stripe, int pos_index) {
     ws_led_t* led = calloc(1, sizeof(ws_led_t));
     led->strip = stripe;
     led->pos_index = pos_index;
+    led->status = LED_STATE_DISABLED;
+    led->prev_status = LED_STATE_DISABLED;
 
-    if (!device_module_add_component(id, &led->base, LEDSTRIP_MODULE)) {
+    if (device_module_add_component(id, &led->base, LEDSTRIP_MODULE) != ESP_OK) {
         free(led);
         return NULL;
     }

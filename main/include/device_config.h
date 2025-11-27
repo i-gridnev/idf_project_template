@@ -4,10 +4,18 @@
 #include <digital_pin.h>
 #include <webserver.h>
 #include <wifi_network.h>
+#include <ws_ledstrip.h>
 
 enum digital_pin_ids {
     PIN_BTN,
     PIN_MAX,
+};
+
+enum led_ids {
+    LED_1,
+    LED_2,
+    LED_3,
+    LED_MAX,
 };
 
 enum config_entry_ids {
@@ -23,7 +31,7 @@ enum {
 
 esp_err_t web_logic();
 
-// esp_err_t led_logic();
+esp_err_t led_logic();
 
 esp_err_t pin_logic();
 

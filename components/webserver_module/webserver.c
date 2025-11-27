@@ -71,8 +71,8 @@ _shutdown_inactivity_timer_callback(void* arg) {
 }
 
 static void
-_free_action(void* data_action) {
-    webserver_req_buffer_t* req_buffer = (webserver_req_buffer_t*)data_action;
+_free_action(void* webserver_req_buffer) {
+    webserver_req_buffer_t* req_buffer = (webserver_req_buffer_t*)webserver_req_buffer;
     if (!req_buffer->buffer.persistent) {
         free(req_buffer->buffer.ptr);
     }
@@ -95,11 +95,8 @@ base_handler(httpd_req_t* req) {
     }
 
     webserver_req_buffer_t* request = calloc(1, sizeof(webserver_req_buffer_t));
-    if (httpd_req_async_handler_begin(req, &request->req) != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
-        free(request);
-        return ESP_FAIL;
-    }
+    request->req = req;
+    request->buffer.persistent = false;
     if (req->method != HTTP_GET) {
         request->buffer.ptr = _read_payload_raw(req);
         if (request->buffer.ptr == NULL) { // error codes are handled while read
@@ -108,8 +105,14 @@ base_handler(httpd_req_t* req) {
         }
         request->buffer.size = strlen(request->buffer.ptr);
     }
+
+    if (httpd_req_async_handler_begin(req, &request->req) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
+        _free_action(request);
+        return ESP_FAIL;
+    }
     event_t evt = {
-        .id = (int)request->req->user_ctx,
+        .id = *(int*)req->user_ctx,
         .issuer = &webserver->base,
         .data = (void*)request,
         .data_size = sizeof(webserver_req_buffer_t),
@@ -121,11 +124,15 @@ base_handler(httpd_req_t* req) {
 static void
 _async_send_handler(void* arg) {
     webserver_req_buffer_t* async_response = (webserver_req_buffer_t*)arg;
-    if (_send_chunked(async_response->req, async_response->buffer.ptr, async_response->buffer.size) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to send to '%s'", async_response->req->uri);
+    esp_err_t err = _send_chunked(async_response->req, async_response->buffer.ptr, async_response->buffer.size);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to respond to '%s' err=%d(%s)", async_response->req->uri, err, esp_err_to_name(err));
+        _free_action(async_response);
+        return;
     }
-    if (httpd_req_async_handler_complete(async_response->req) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to complete async req");
+    err = httpd_req_async_handler_complete(async_response->req);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to complete async respond err=%d(%s)", err, esp_err_to_name(err));
     }
     _free_action(async_response);
 }
@@ -139,8 +146,16 @@ _when_httpd_stop(void* global_user_ctx) {
 esp_err_t
 webserver_enqueue_response(webserver_req_buffer_t* response) {
     webserver_req_buffer_t* async_response = calloc(1, sizeof(webserver_req_buffer_t));
-    memcpy(async_response, response, sizeof(webserver_req_buffer_t));
-    return httpd_queue_work(response->req->handle, _async_send_handler, async_response);
+    async_response->req = response->req;
+    async_response->buffer.ptr = response->buffer.ptr; // safe if persistent/static
+    async_response->buffer.size = response->buffer.size;
+    async_response->buffer.persistent = response->buffer.persistent;
+    esp_err_t err = httpd_queue_work(response->req->handle, _async_send_handler, async_response);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to enqueue async response err=%d(%s)", err, esp_err_to_name(err));
+        _free_action(async_response);
+    }
+    return err;
 }
 
 esp_err_t
@@ -163,7 +178,7 @@ webserver_start_http() {
                     .uri = webserver->server_config.uris[i].uri,
                     .method = webserver->server_config.uris[i].method,
                     .handler = base_handler,
-                    .user_ctx = (void*)webserver->server_config.uris[i].event_id,
+                    .user_ctx = &webserver->server_config.uris[i].event_id,
                 };
                 ESP_LOGI(TAG, "register uri='%s'", uri.uri);
                 err = httpd_register_uri_handler(webserver->server, &uri);
@@ -213,7 +228,7 @@ webserver_component_t*
 webserver_create(webserver_component_config_t* config) {
     esp_err_t err = ESP_OK;
     webserver_component_t* webserver = calloc(1, sizeof(webserver_component_t));
-    memcpy(&webserver->server_config, config, sizeof(webserver_component_t));
+    memcpy(&webserver->server_config, config, sizeof(webserver_component_config_t));
     httpd_ssl_config_t ssl_cnf = HTTPD_SSL_CONFIG_DEFAULT();
     memcpy(&webserver->https_config, &ssl_cnf, sizeof(httpd_ssl_config_t));
     webserver->https_config.httpd.max_open_sockets = webserver->server_config.max_open_sockets;
@@ -228,7 +243,7 @@ webserver_create(webserver_component_config_t* config) {
         return NULL;
     }
 
-    if (!device_module_add_component(SOLO_COMPONENT_ID, &webserver->base, WEBSERVER_MODULE)) {
+    if (device_module_add_component(SOLO_COMPONENT_ID, &webserver->base, WEBSERVER_MODULE) != ESP_OK) {
         free(webserver);
         return NULL;
     }
