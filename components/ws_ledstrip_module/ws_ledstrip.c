@@ -38,54 +38,58 @@ static _module_aux_t LEDSTRIP_MODULE_AUX;
 static esp_err_t
 _tick_led(ws_led_t* led) {
     esp_err_t err = ESP_OK;
+    led_status_t* a = &led->active_status;
+    led_status_t* p = &led->prev_status;
     led->tick_counter++;
-    if (led->status == LED_STATE_ON) {
-        if (led->status != led->prev_status) {
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, led->red, led->green, led->blue);
-            led->_on = true;
+    if (a->type == LED_STATE_STEADY) {
+        if (a->type != p->type) {
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
+            a->_on = !((a->red == 0) && (a->green == 0) && (a->blue == 0));
             led->strip->need_update = true;
+            ESP_LOGW(TAG, "upd led pos_index=%d, _on=%s, r%d:g:%d:b%d", led->pos_index, a->_on ? "true" : "false",
+                     a->red, a->green, a->blue);
         }
-    } else if (led->status == LED_STATE_OFF) {
-        if (led->status != led->prev_status) {
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, 0, 0, 0);
-            led->_on = false;
-            led->strip->need_update = true;
-        }
-    } else if (led->status == LED_STATE_BLINK) {
-        if (led->status != led->prev_status || (!led->_on && led->tick_counter == led->status_opt.blink.off_ms)) {
+    } else if (a->type == LED_STATE_BLINK) {
+        if (a->type != p->type || (!a->_on && led->tick_counter == led->status_opt.blink.off_ms)) {
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, led->red, led->green, led->blue);
-            led->_on = true;
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
+            a->_on = true;
             led->strip->need_update = true;
-        } else if (led->_on && led->tick_counter == led->status_opt.blink.on_ms) {
+        } else if (a->_on && led->tick_counter == led->status_opt.blink.on_ms) {
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, 0, 0, 0);
-            led->_on = false;
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, 0, 0, 0);
+            a->_on = false;
             led->strip->need_update = true;
         }
-    } else if (led->status == LED_STATE_BLINK_REPEAT) {
-        if (led->status != led->prev_status
-            || (!led->_on && led->repeat_counter == led->status_opt.blink_repeat.repeat
+    } else if (a->type == LED_STATE_BLINK_REPEAT) {
+        if (a->type != p->type
+            || (!a->_on && led->repeat_counter == led->status_opt.blink_repeat.repeat
                 && led->tick_counter == led->status_opt.blink_repeat.repeat_delay_ms)) {
             led->repeat_counter = 0;
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, led->red, led->green, led->blue);
-            led->_on = true;
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
+            a->_on = true;
             led->strip->need_update = true;
-        } else if (!led->_on && led->tick_counter == led->status_opt.blink_repeat.off_ms) {
+        } else if (!a->_on && led->tick_counter == led->status_opt.blink_repeat.off_ms) {
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, led->red, led->green, led->blue);
-            led->_on = true;
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
+            a->_on = true;
             led->strip->need_update = true;
-        } else if (led->_on && led->tick_counter == led->status_opt.blink_repeat.on_ms) {
+        } else if (a->_on && led->tick_counter == led->status_opt.blink_repeat.on_ms) {
             led->repeat_counter++;
             led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->base.id, 0, 0, 0);
-            led->_on = false;
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, 0, 0, 0);
+            a->_on = false;
+            led->strip->need_update = true;
+        }
+    } else if (a->type == LED_STATE_DISABLED) {
+        if (a->_on) {
+            err = led_strip_set_pixel(led->strip->handle, led->pos_index, 0, 0, 0);
+            a->_on = false;
             led->strip->need_update = true;
         }
     }
-    led->status = led->prev_status;
+    memcpy(p, a, sizeof(led_status_t));
     return err;
 }
 
@@ -133,7 +137,7 @@ manager_task(void* arg) {
 // }
 
 esp_err_t
-ws_led_set(int led_id, led_status_e status, uint8_t r, uint8_t g, uint8_t b, led_status_opt_t* opt) {
+ws_led_set(int led_id, led_status_t* status, led_status_opt_t* opt) {
     ws_led_t* led = (ws_led_t*)device_module_get_component(LEDSTRIP_MODULE, led_id);
     if (led == NULL) {
         ESP_LOGE(TAG, "led id=%d not found", led_id);
@@ -144,13 +148,10 @@ ws_led_set(int led_id, led_status_e status, uint8_t r, uint8_t g, uint8_t b, led
         ESP_LOGE(TAG, "led id=%d remains locked", led_id);
         return ESP_ERR_INVALID_STATE;
     }
-
     led->tick_counter = 0;
     led->repeat_counter = 0;
-    led->status = status;
-    led->red = r;
-    led->green = g;
-    led->blue = b;
+    led->prev_status.type = LED_STATE_DISABLED;
+    memcpy(&led->active_status, status, sizeof(led_status_t));
     if (opt) {
         memcpy(&led->status_opt, opt, sizeof(led_status_opt_t));
     } else {
@@ -162,14 +163,15 @@ ws_led_set(int led_id, led_status_e status, uint8_t r, uint8_t g, uint8_t b, led
 }
 
 bool
-filter_stripe_exist(ws_strip_t item, void* ctx) {
-    int32_t gpio = (int)ctx;
+filter_stripe_exist(ws_strip_t* item, void* ctx) {
+    int32_t gpio = *(int32_t*)ctx;
     return item->gpio == gpio;
 }
 
-ws_strip_t
+ws_strip_t*
 ws_ledstrip_create(int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_out) {
     if (!LEDSTRIP_MODULE_AUX.task) { // On first call init all auxilary configs
+        ESP_LOGW(TAG, "led manager aux inited");
         BaseType_t ret =
             xTaskCreatePinnedToCore(manager_task, "ledman", LED_MANAGER_TASK_STACK, NULL, LED_MANAGER_TASK_PRIO,
                                     &LEDSTRIP_MODULE_AUX.task, LED_MANAGER_TASK_CORE);
@@ -182,10 +184,11 @@ ws_ledstrip_create(int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_o
             ESP_LOGE(TAG, "led lock init failed");
             ESP_ERROR_CHECK(ESP_ERR_INVALID_STATE);
         }
+        SLIST_INIT(&LEDSTRIP_MODULE_AUX.stripes);
     }
 
     struct ws_strip* stripe = NULL;
-    if (SLIST_GET_WITH_TAIL(&LEDSTRIP_MODULE_AUX.stripes, next, &stripe, filter_stripe_exist, (void*)gpio)) {
+    if (SLIST_GET_WITH_TAIL(&LEDSTRIP_MODULE_AUX.stripes, next, &stripe, filter_stripe_exist, &gpio)) {
         ESP_LOGE(TAG, "stripe on gpio=%d already registered", (int)gpio);
         return NULL;
     }
@@ -221,12 +224,12 @@ ws_ledstrip_create(int32_t gpio, uint32_t max_leds, bool with_dma, bool invert_o
 }
 
 ws_led_t*
-ws_led_create(int id, ws_strip_t stripe, int pos_index) {
+ws_led_create(int id, ws_strip_t* stripe, int pos_index) {
     ws_led_t* led = calloc(1, sizeof(ws_led_t));
     led->strip = stripe;
     led->pos_index = pos_index;
-    led->status = LED_STATE_DISABLED;
-    led->prev_status = LED_STATE_DISABLED;
+    led->active_status.type = LED_STATE_DISABLED;
+    led->prev_status.type = LED_STATE_DISABLED;
 
     if (device_module_add_component(id, &led->base, LEDSTRIP_MODULE) != ESP_OK) {
         free(led);
