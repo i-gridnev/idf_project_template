@@ -13,7 +13,7 @@ led_logic() {
     if (strip == NULL) {
         return err;
     }
-    for (int i = LED_1; i < LED_MAX; i++) {
+    for (int i = LED_WIFI_SMART; i < LED_MAX; i++) {
         ws_led_t* led = ws_led_create(i, strip, i);
         if (led == NULL) {
             return err;

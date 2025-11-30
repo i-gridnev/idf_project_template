@@ -12,7 +12,7 @@ enum digital_pin_ids {
 };
 
 enum led_ids {
-    LED_1,
+    LED_WIFI_SMART,
     LED_2,
     LED_3,
     LED_MAX,
@@ -27,6 +27,8 @@ enum config_entry_ids {
 enum {
     EVT_WEBSERVER_UI_ON_ROOT = EVT_WEBSERVER_USER_URI,
     EVT_WEBSERVER_UI_ON_TEST,
+    EVT_WEBSERVER_UI_ON_TEST2,
+    EVT_WEBSERVER_UI_ON_TEST3,
 };
 
 esp_err_t web_logic();

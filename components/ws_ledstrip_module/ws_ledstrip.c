@@ -46,8 +46,6 @@ _tick_led(ws_led_t* led) {
             err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
             a->_on = !((a->red == 0) && (a->green == 0) && (a->blue == 0));
             led->strip->need_update = true;
-            ESP_LOGW(TAG, "upd led pos_index=%d, _on=%s, r%d:g:%d:b%d", led->pos_index, a->_on ? "true" : "false",
-                     a->red, a->green, a->blue);
         }
     } else if (a->type == LED_STATE_BLINK) {
         if (a->type != p->type || (!a->_on && led->tick_counter == led->status_opt.blink.off_ms)) {
@@ -62,14 +60,14 @@ _tick_led(ws_led_t* led) {
             led->strip->need_update = true;
         }
     } else if (a->type == LED_STATE_BLINK_REPEAT) {
-        if (a->type != p->type
-            || (!a->_on && led->repeat_counter == led->status_opt.blink_repeat.repeat
-                && led->tick_counter == led->status_opt.blink_repeat.repeat_delay_ms)) {
-            led->repeat_counter = 0;
-            led->tick_counter = 0;
-            err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
-            a->_on = true;
-            led->strip->need_update = true;
+        if ((a->type != p->type) || (!a->_on && led->repeat_counter == led->status_opt.blink_repeat.repeat)) {
+            if (a->type != p->type || led->tick_counter == led->status_opt.blink_repeat.repeat_delay_ms) {
+                led->repeat_counter = 0;
+                led->tick_counter = 0;
+                err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);
+                a->_on = true;
+                led->strip->need_update = true;
+            }
         } else if (!a->_on && led->tick_counter == led->status_opt.blink_repeat.off_ms) {
             led->tick_counter = 0;
             err = led_strip_set_pixel(led->strip->handle, led->pos_index, a->red, a->green, a->blue);

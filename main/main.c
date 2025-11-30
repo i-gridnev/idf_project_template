@@ -42,9 +42,10 @@ app_main(void) {
     ESP_LOGI(TAG, ":::Initialized RAM: free=%lu, min=%lu", esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
     ESP_ERROR_CHECK(device_init());
 
+    ESP_ERROR_CHECK(led_logic());
     ESP_ERROR_CHECK(web_logic());
     ESP_ERROR_CHECK(pin_logic());
-    ESP_ERROR_CHECK(led_logic());
+    
 
     /*==============================================*/
 

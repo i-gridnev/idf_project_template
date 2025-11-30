@@ -50,6 +50,76 @@ on_test(component_base_t* subscriber, event_t* event) {
     return webserver_enqueue_response(&response);
 }
 
+esp_err_t
+on_test2(component_base_t* subscriber, event_t* event) {
+    webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
+
+    ESP_LOGI(TAG, "%s", request->buffer.ptr);
+
+    cJSON* input = cJSON_Parse(request->buffer.ptr);
+    int index = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "index"));
+    int r = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "r"));
+    int g = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "g"));
+    int b = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "b"));
+    int on_ms = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "on"));
+    int off_ms = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "off"));
+    cJSON_Delete(input);
+
+    led_status_t st = {
+        .type = LED_STATE_BLINK,
+        .red = r,
+        .green = g,
+        .blue = b,
+    };
+    led_status_opt_t opt = {.blink = {.on_ms = on_ms / 20, .off_ms = off_ms / 20}};
+
+    ws_led_set(index, &st, &opt);
+
+    webserver_req_buffer_t response = {
+        .req = request->req,
+        .buffer = {.ptr = msg_success, .size = strlen(msg_success), .persistent = true},
+    };
+    httpd_resp_set_type(response.req, HTTPD_TYPE_TEXT);
+    return webserver_enqueue_response(&response);
+}
+
+esp_err_t
+on_test3(component_base_t* subscriber, event_t* event) {
+    webserver_req_buffer_t* request = (webserver_req_buffer_t*)event->data;
+
+    ESP_LOGI(TAG, "%s", request->buffer.ptr);
+
+    cJSON* input = cJSON_Parse(request->buffer.ptr);
+    int index = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "index"));
+    int r = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "r"));
+    int g = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "g"));
+    int b = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "b"));
+    int on_ms = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "on"));
+    int off_ms = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "off"));
+    int delay_ms = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "delay"));
+    int repeat = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(input, "repeat"));
+    cJSON_Delete(input);
+
+    led_status_t st = {
+        .type = LED_STATE_BLINK_REPEAT,
+        .red = r,
+        .green = g,
+        .blue = b,
+    };
+    led_status_opt_t opt = {
+        .blink_repeat = {
+            .on_ms = on_ms / 20, .off_ms = off_ms / 20, .repeat = repeat, .repeat_delay_ms = delay_ms / 20}};
+
+    ws_led_set(index, &st, &opt);
+
+    webserver_req_buffer_t response = {
+        .req = request->req,
+        .buffer = {.ptr = msg_success, .size = strlen(msg_success), .persistent = true},
+    };
+    httpd_resp_set_type(response.req, HTTPD_TYPE_TEXT);
+    return webserver_enqueue_response(&response);
+}
+
 webserver_uri_t URIS[] = {
     {
         .uri = "/",
@@ -62,6 +132,18 @@ webserver_uri_t URIS[] = {
         .method = HTTP_POST,
         .event_id = EVT_WEBSERVER_UI_ON_TEST,
         .handler = on_test,
+    },
+    {
+        .uri = "/test2",
+        .method = HTTP_POST,
+        .event_id = EVT_WEBSERVER_UI_ON_TEST2,
+        .handler = on_test2,
+    },
+    {
+        .uri = "/test3",
+        .method = HTTP_POST,
+        .event_id = EVT_WEBSERVER_UI_ON_TEST3,
+        .handler = on_test3,
     },
 };
 
@@ -87,11 +169,27 @@ wifi_middelware(component_base_t* subscriber, event_t* event) {
 
     if (event->id == EVT_WIFI_STA_CONNECTION) {
         if (evt_data.success) {
+            led_status_t status = {.type = LED_STATE_STEADY, .red = 0, .green = 255, .blue = 0};
+            ws_led_set(LED_WIFI_SMART, &status, NULL);
             if (!webserver->is_started) {
                 err = webserver_start_http();
             }
         } else {
+            led_status_t status = {.type = LED_STATE_STEADY, .red = 255, .green = 255, .blue = 0};
+            ws_led_set(LED_WIFI_SMART, &status, NULL);
             ESP_LOGW(TAG, "Wifi off, web is still alive");
+        }
+    } else if (event->id == EVT_WIFI_READY) {
+        led_status_t status = {.type = LED_STATE_STEADY, .red = 255, .green = 255, .blue = 0};
+        ws_led_set(LED_WIFI_SMART, &status, NULL);
+    } else if (event->id == EVT_WIFI_STA_TRYING) {
+        if (evt_data.success) {
+            led_status_t status = {.type = LED_STATE_BLINK, .red = 255, .green = 255, .blue = 0};
+            led_status_opt_t opt = {.blink = {.on_ms = 300 / 20, .off_ms = 300 / 20}};
+            ws_led_set(LED_WIFI_SMART, &status, &opt);
+        } else {
+            led_status_t status = {.type = LED_STATE_STEADY, .red = 255, .green = 255, .blue = 0};
+            ws_led_set(LED_WIFI_SMART, &status, NULL);
         }
     }
     return err;
@@ -112,7 +210,7 @@ web_logic() {
     wifi_component_config_t wifi_cfg = {
         .mode = WIFI_MODE_STA,
         .reconnect_attempts = 3,
-        .reconnect_interval_ms = 7000,
+        .reconnect_interval_ms = 10000,
     };
     wifi_network_create(&wifi_cfg);
 
